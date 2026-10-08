@@ -1,0 +1,2 @@
+comparison_id	case_condition	reference_condition	design	inference	modules
+treated_vs_control	treated	control	~condition	descriptive	loops;insulation

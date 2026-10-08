@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-07",
+  "glibc_override": "2.17",
+  "platform": "linux-64",
+  "records": {
+    "core": {
+      "conda_dry_solve_success": true,
+      "definition_sha256": "b78ce5848b8e9096628e8aa18553eaec570a79b8b81dfdd38a52b39ea3bf1dc5",
+      "package_count": 300,
+      "pip_note": null,
+      "principal_versions": {
+        "bioframe": "0.7.2",
+        "cooler": "0.10.4",
+        "cooltools": "0.7.1",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "python": "3.11.17",
+        "scipy": "1.13.1"
+      },
+      "runtime_verified_on_linux": false,
+      "solved_package_identity_digest": "47d361a9533ca0b4ccca245051dc1499844051594e018a79e4d431b94c95cb60"
+    },
+    "hicrep": {
+      "conda_dry_solve_success": true,
+      "definition_sha256": "a13485696eb89d11259a8da0e9df82f87c8b8760f47442573f251b838e5e3213",
+      "package_count": 251,
+      "pip_note": "HiCRep 0.2.6 installed and numerically exercised locally on Windows; Linux dry solve does not execute pip",
+      "principal_versions": {
+        "cooler": "0.10.4",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "python": "3.11.17",
+        "scipy": "1.13.1"
+      },
+      "runtime_verified_on_linux": false,
+      "solved_package_identity_digest": "0ba8ba1996cc346848b2a2861f93adbb49ed2a52247b61792320705b33413bd4"
+    },
+    "r": {
+      "conda_dry_solve_success": true,
+      "definition_sha256": "5f88ea4eec280d62f22a9bdfae04ce2a2fc688ffeaf0fe5e5f233440ba26c364",
+      "package_count": 95,
+      "pip_note": null,
+      "principal_versions": {
+        "bioconductor-edger": "4.8.2",
+        "bioconductor-limma": "3.66.0",
+        "r-base": "4.5.3",
+        "r-jsonlite": "2.0.0",
+        "r-statmod": "1.5.2"
+      },
+      "runtime_verified_on_linux": false,
+      "solved_package_identity_digest": "810bb7a1ed6088f030aaad999c1a49984d74c90f62fc5985683259ea1009b039"
+    }
+  },
+  "rejected_r_candidate": {
+    "edgeR": "4.10.5",
+    "limma": "3.68.5",
+    "r_base": "4.6",
+    "reason": [
+      "Could not solve for environment specs\n    The following packages are incompatible\n    \u251c\u2500 bioconductor-edger =4.10.5 * does not exist (perhaps a typo or a missing channel);\n    \u251c\u2500 bioconductor-limma =3.68.5 * does not exist (perhaps a typo or a missing channel);\n    \u251c\u2500 r-base =4.6 * is requested and can be installed;\n    \u2514\u2500 r-statmod =* * is not installable because there are no viable options\n       \u251c\u2500 r-statmod [1.5.0|1.5.1|1.5.2] would require\n       \u2502  \u2514\u2500 r-base >=4.5,<4.6.0a0 *, which conflicts with any installable versions previously reported;\n       \u251c\u2500 r-statmod [1.5.0|1.5.1|1.5.2] would require\n       \u2502  \u2514\u2500 r-base >=4.4,<4.5.0a0 *, which conflicts with any installable versions previously reported;\n       \u251c\u2500 r-statmod 1.5.0 would require\n       \u2502  \u2514\u2500 r-base >=4.3,<4.4.0a0 *, which conflicts with any installable versions previously reported;\n       \u251c\u2500 r-statmod [1.4.37|1.5.0] would require\n       \u2502  \u2514\u2500 r-base >=4.2,<4.3.0a0 *, which conflicts with any installable versions previously reported;\n       \u251c\u2500 r-statmod [1.4.36|1.4.37|1.5.0] would require\n       \u2502  \u2514\u2500 r-base >=4.1,<4.2.0a0 *, which conflicts with any installable versions previously reported;\n       \u251c\u2500 r-statmod [1.4.34|1.4.35|1.4.36|1.4.37] would require\n       \u2502  \u2514\u2500 r-base >=4.0,<4.1.0a0 *, which conflicts with any installable versions previously reported;\n       \u251c\u2500 r-statmod [1.4.32|1.4.33|1.4.34|1.4.35|1.4.36] would require\n       \u2502  \u2514\u2500 r-base >=3.6,<3.7.0a0 *, which conflicts with any installable versions previously reported;\n       \u251c\u2500 r-statmod [1.4.30|1.4.32|1.4.33|1.4.34] would require\n       \u2502  \u2514\u2500 r-base [>=3.5,<3.6.0a0 *|>=3.5.1,<3.5.2.0a0 *], which conflicts with any installable versions previously reported;\n       \u251c\u2500 r-statmod 1.4.30 would require\n       \u2502  \u2514\u2500 r-base [=3.4.1 *|>=3.4.1,<3.4.2.0a0 *], which conflicts with any installable versions previously reported;\n       \u251c\u2500 r-statmod [1.4.29|1.4.30] would require\n       \u2502  \u2514\u2500 r-base =3.3.2 *, which conflicts with any installable versions previously reported;\n       \u251c\u2500 r-statmod 1.4.29 would require\n       \u2502  \u2514\u2500 r-base =3.3.1 *, which does not exist (perhaps a missing channel);\n       \u251c\u2500 r-statmod 1.4.22 would require\n       \u2502  \u2514\u2500 r =3.2.2 *, which does not exist (perhaps a missing channel);\n       \u2514\u2500 r-statmod 1.4.22 would require\n          \u2514\u2500 r =3.3.1 *, which does not exist (perhaps a missing channel)."
+    ],
+    "success": false
+  },
+  "solver": "micromamba 2.9.0 on Windows; dry cross-solve only",
+  "status": "dependency_solutions_available; full_Linux_runtime_and_exact_tested_locks_pending"
+}

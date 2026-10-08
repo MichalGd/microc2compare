@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "reference_id",
+    "chromsizes",
+    "chromsizes_sha256",
+    "views",
+    "views_sha256"
+  ],
+  "properties": {
+    "reference_id": {
+      "type": "string"
+    },
+    "chromsizes": {
+      "type": "string"
+    },
+    "chromsizes_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "views": {
+      "type": "string"
+    },
+    "views_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "additionalProperties": true
+}

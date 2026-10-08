@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "reference_id",
+    "count_units",
+    "filters",
+    "balancing",
+    "dedup_scope",
+    "library_ids",
+    "source_ids"
+  ],
+  "properties": {
+    "reference_id": {
+      "type": "string"
+    },
+    "count_units": {
+      "const": "unique_contacts"
+    },
+    "dedup_scope": {
+      "type": "string"
+    },
+    "library_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "filters": {
+      "type": "object",
+      "required": [
+        "mapq",
+        "min_distance_bp",
+        "chromosome_policy"
+      ]
+    },
+    "balancing": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

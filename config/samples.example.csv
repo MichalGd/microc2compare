@@ -1,0 +1,7 @@
+sample_id,project,condition,assay,biological_replicate,subject_id,reference_id,matrix_path,provenance_path,batch
+C1,project,control,microc,1,culture_C1,reference,/upstream/C1.norm.mcool,/upstream/C1.provenance.json,b1
+C2,project,control,microc,2,culture_C2,reference,/upstream/C2.norm.mcool,/upstream/C2.provenance.json,b2
+C3,project,control,microc,3,culture_C3,reference,/upstream/C3.norm.mcool,/upstream/C3.provenance.json,b3
+T1,project,treated,microc,1,culture_T1,reference,/upstream/T1.norm.mcool,/upstream/T1.provenance.json,b1
+T2,project,treated,microc,2,culture_T2,reference,/upstream/T2.norm.mcool,/upstream/T2.provenance.json,b2
+T3,project,treated,microc,3,culture_T3,reference,/upstream/T3.norm.mcool,/upstream/T3.provenance.json,b3

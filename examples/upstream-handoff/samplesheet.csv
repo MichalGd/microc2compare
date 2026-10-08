@@ -1,0 +1,8 @@
+sample,assay,reference_genome,condition,biological_replicate,technical_replicate,fastq_r1,fastq_r2
+C1_A,microc,mm39,control,1,1,/reads/C1_library_A_R1.fastq.gz,/reads/C1_library_A_R2.fastq.gz
+C1_B,microc,mm39,control,1,2,/reads/C1_library_B_R1.fastq.gz,/reads/C1_library_B_R2.fastq.gz
+C2,microc,mm39,control,2,1,/reads/C2_R1.fastq.gz,/reads/C2_R2.fastq.gz
+C3,microc,mm39,control,3,1,/reads/C3_R1.fastq.gz,/reads/C3_R2.fastq.gz
+T1,microc,mm39,treated,1,1,/reads/T1_R1.fastq.gz,/reads/T1_R2.fastq.gz
+T2,microc,mm39,treated,2,1,/reads/T2_R1.fastq.gz,/reads/T2_R2.fastq.gz
+T3,microc,mm39,treated,3,1,/reads/T3_R1.fastq.gz,/reads/T3_R2.fastq.gz

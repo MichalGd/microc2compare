@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "microc2compare"
+version = "0.2.5"
+description = "Shell-coordinated replicate-aware comparisons of existing Micro-C/Hi-C matrices"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest==8.3.5", "jsonschema==4.23.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["scientific: requires Cooler/cooltools/HiCRep", "r: requires R/edgeR/limma"]

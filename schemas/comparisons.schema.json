@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "comparison_id",
+      "case_condition",
+      "reference_condition",
+      "design",
+      "inference",
+      "modules"
+    ],
+    "properties": {
+      "comparison_id": {
+        "type": "string"
+      },
+      "case_condition": {
+        "type": "string"
+      },
+      "reference_condition": {
+        "type": "string"
+      },
+      "design": {
+        "type": "string"
+      },
+      "inference": {
+        "type": "string"
+      },
+      "modules": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": true
+  }
+}

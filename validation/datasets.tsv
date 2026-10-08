@@ -1,0 +1,3 @@
+dataset_id	assay	purpose	primary_source	selection_status
+hsieh_acute_perturbation	microc	biological_validation	https://pmc.ncbi.nlm.nih.gov/articles/PMC9729117/	exact_accessions_and_independent_features_pending
+rao_cohesin_depletion	hic	preliminary_two_replicate_validation	https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE104334	exact_files_membership_and_checksums_pending

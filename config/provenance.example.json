@@ -1,0 +1,13 @@
+{
+  "reference_id": "reference",
+  "count_units": "unique_contacts",
+  "filters": {"mapq": 30, "min_distance_bp": 1000, "chromosome_policy": "registered_assembly_chromosomes"},
+  "dedup_scope": "joint_library",
+  "library_ids": ["C1_library"],
+  "source_ids": ["C1_source"],
+  "upstream_commit": "REPLACE_WITH_ACTUAL_COMMIT",
+  "balancing": {
+    "10000": {"weight_column": "weight", "convention": "multiplicative", "converged": true, "recipe": {"method": "REPLACE_WITH_ACTUAL_UPSTREAM_RECIPE"}},
+    "100000": {"weight_column": "weight", "convention": "multiplicative", "converged": true, "recipe": {"method": "REPLACE_WITH_ACTUAL_UPSTREAM_RECIPE"}}
+  }
+}

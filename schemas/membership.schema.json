@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "sample_id",
+      "library_id",
+      "source_id",
+      "source_kind",
+      "dedup_group_id",
+      "dedup_scope",
+      "source_checksum"
+    ],
+    "properties": {
+      "sample_id": {
+        "type": "string"
+      },
+      "library_id": {
+        "type": "string"
+      },
+      "source_id": {
+        "type": "string"
+      },
+      "source_kind": {
+        "type": "string"
+      },
+      "dedup_group_id": {
+        "type": "string"
+      },
+      "dedup_scope": {
+        "type": "string"
+      },
+      "source_checksum": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": true
+  }
+}

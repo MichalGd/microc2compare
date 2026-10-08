@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "sample_id",
+      "project",
+      "condition",
+      "assay",
+      "biological_replicate",
+      "subject_id",
+      "reference_id",
+      "matrix_path",
+      "provenance_path"
+    ],
+    "properties": {
+      "sample_id": {
+        "type": "string"
+      },
+      "project": {
+        "type": "string"
+      },
+      "condition": {
+        "type": "string"
+      },
+      "assay": {
+        "type": "string"
+      },
+      "biological_replicate": {
+        "type": "string"
+      },
+      "subject_id": {
+        "type": "string"
+      },
+      "reference_id": {
+        "type": "string"
+      },
+      "matrix_path": {
+        "type": "string"
+      },
+      "provenance_path": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": true
+  }
+}

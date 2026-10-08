@@ -1,0 +1,746 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Normalized microc2compare configuration",
+  "type": "object",
+  "properties": {
+    "PIPELINE_NAME": {
+      "type": "string",
+      "default": "microc2compare"
+    },
+    "SCHEMA_VERSION": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1
+    },
+    "PROJECT": {
+      "type": "string",
+      "default": "project"
+    },
+    "ANALYSIS_SET_ID": {
+      "type": "string",
+      "default": "analysis"
+    },
+    "RUN_ID": {
+      "type": "string",
+      "default": "run001"
+    },
+    "REFERENCE_ID": {
+      "type": "string",
+      "default": "reference"
+    },
+    "ANALYSIS_MODE": {
+      "type": "string",
+      "default": "within_assay",
+      "enum": [
+        "within_assay",
+        "assay_comparison"
+      ]
+    },
+    "SAMPLESHEET": {
+      "type": "string",
+      "default": "samples.csv"
+    },
+    "TECHNICAL_MEMBERSHIP": {
+      "type": "string",
+      "default": "technical_membership.tsv"
+    },
+    "COMPARISONS": {
+      "type": "string",
+      "default": "comparisons.tsv"
+    },
+    "REFERENCE_REGISTRY": {
+      "type": "string",
+      "default": "references.yaml"
+    },
+    "INDEPENDENT_FEATURES_REGISTRY": {
+      "type": "string",
+      "default": ""
+    },
+    "OUTDIR": {
+      "type": "string",
+      "default": "../results"
+    },
+    "SCRATCH_ROOT": {
+      "type": "string",
+      "default": "../scratch"
+    },
+    "RANDOM_SEED": {
+      "type": "integer",
+      "default": 20261007,
+      "minimum": 0
+    },
+    "PYTHON_BOOTSTRAP": {
+      "type": "string",
+      "default": "python3"
+    },
+    "CONDA_EXE": {
+      "type": "string",
+      "default": "conda"
+    },
+    "ENVIRONMENT_MODE": {
+      "type": "string",
+      "default": "reuse",
+      "enum": [
+        "reuse",
+        "locked",
+        "development"
+      ]
+    },
+    "CORE_ENV_PREFIX": {
+      "type": "string",
+      "default": "/opt/conda_envs/microc2compare/envs/core-0.1.0-clone-20261007"
+    },
+    "HICREP_ENV_PREFIX": {
+      "type": "string",
+      "default": "/opt/conda_envs/microc2compare/envs/hicrep-0.1.0-shared-20261007"
+    },
+    "DIFF_R_ENV_PREFIX": {
+      "type": "string",
+      "default": "/opt/conda_envs/microc2compare/envs/diff-r"
+    },
+    "CORE_LOCK": {
+      "type": "string",
+      "default": ""
+    },
+    "HICREP_LOCK": {
+      "type": "string",
+      "default": ""
+    },
+    "DIFF_R_LOCK": {
+      "type": "string",
+      "default": ""
+    },
+    "R_SCRIPT": {
+      "type": "string",
+      "default": "Rscript"
+    },
+    "RUN_QC": {
+      "type": "boolean",
+      "default": true
+    },
+    "RUN_HICREP": {
+      "type": "boolean",
+      "default": true
+    },
+    "RUN_POOL": {
+      "type": "boolean",
+      "default": false
+    },
+    "POOL_MODE": {
+      "type": "string",
+      "default": "import",
+      "enum": [
+        "import",
+        "create"
+      ]
+    },
+    "POOLS_MANIFEST": {
+      "type": "string",
+      "default": ""
+    },
+    "RUN_DEPTH_SENSITIVITY": {
+      "type": "boolean",
+      "default": false
+    },
+    "DEPTH_SENSITIVITY_MODE": {
+      "type": "string",
+      "default": "raw_only",
+      "enum": [
+        "raw_only",
+        "balanced_features"
+      ]
+    },
+    "BALANCE_NEW_DERIVED_MAPS": {
+      "type": "boolean",
+      "default": false
+    },
+    "RUN_COMPARTMENTS": {
+      "type": "boolean",
+      "default": true
+    },
+    "RUN_INSULATION": {
+      "type": "boolean",
+      "default": true
+    },
+    "RUN_LOOPS": {
+      "type": "boolean",
+      "default": true
+    },
+    "RUN_AGGREGATES": {
+      "type": "boolean",
+      "default": true
+    },
+    "RUN_DIFFERENTIAL": {
+      "type": "boolean",
+      "default": true
+    },
+    "RUN_FINAL_REPORT": {
+      "type": "boolean",
+      "default": true
+    },
+    "KEEP_POOLED_MAPS": {
+      "type": "boolean",
+      "default": false
+    },
+    "KEEP_DOWNSAMPLED_MAPS": {
+      "type": "boolean",
+      "default": false
+    },
+    "CLEAN_SCRATCH_ON_SUCCESS": {
+      "type": "boolean",
+      "default": true
+    },
+    "COMPARTMENT_RESOLUTION": {
+      "type": "integer",
+      "default": 100000,
+      "minimum": 1
+    },
+    "INSULATION_RESOLUTION": {
+      "type": "integer",
+      "default": 10000,
+      "minimum": 1
+    },
+    "INSULATION_WINDOWS_BP": {
+      "type": "string",
+      "default": "50000,100000,250000"
+    },
+    "INSULATION_PRIMARY_WINDOW_BP": {
+      "type": "integer",
+      "default": 100000,
+      "minimum": 1
+    },
+    "INSULATION_MIN_VALID_PIXEL_FRACTION": {
+      "type": "number",
+      "default": 0.8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    "INSULATION_IGNORE_DIAGS": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 0
+    },
+    "LOOP_RESOLUTION": {
+      "type": "integer",
+      "default": 10000,
+      "minimum": 1
+    },
+    "LOOP_SENSITIVITY_RESOLUTIONS": {
+      "type": "string",
+      "default": ""
+    },
+    "FINE_RESOLUTION_QC_APPROVED": {
+      "type": "boolean",
+      "default": false
+    },
+    "LOOP_CALLER": {
+      "type": "string",
+      "default": "cooltools_dots",
+      "enum": [
+        "cooltools_dots"
+      ]
+    },
+    "LOOP_MIN_DISTANCE_BP": {
+      "type": "integer",
+      "default": 50000,
+      "minimum": 1
+    },
+    "LOOP_MAX_DISTANCE_BP": {
+      "type": "integer",
+      "default": 2000000,
+      "minimum": 1
+    },
+    "LOOP_CONSENSUS_TOLERANCE_BINS": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1
+    },
+    "LOOP_COUNT_WINDOW_BINS": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1
+    },
+    "LOOP_MIN_TOTAL_COUNT": {
+      "type": "integer",
+      "default": 20,
+      "minimum": 1
+    },
+    "LOOP_MIN_MEAN_COUNT_AT_MIN_EXPOSURE": {
+      "type": "integer",
+      "default": 5,
+      "minimum": 1
+    },
+    "LOOP_MIN_FEATURES_FORMAL": {
+      "type": "integer",
+      "default": 1000,
+      "minimum": 1
+    },
+    "LOOP_NORMALIZATION": {
+      "type": "string",
+      "default": "eligible_cis_exposure",
+      "enum": [
+        "eligible_cis_exposure"
+      ]
+    },
+    "PS_RESOLUTION": {
+      "type": "integer",
+      "default": 10000,
+      "minimum": 1
+    },
+    "HICREP_RESOLUTION": {
+      "type": "integer",
+      "default": 10000,
+      "minimum": 1
+    },
+    "HICREP_MAX_DISTANCE_BP": {
+      "type": "integer",
+      "default": 2000000,
+      "minimum": 1
+    },
+    "HICREP_SMOOTHING_BINS": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 1
+    },
+    "DOWNSAMPLING_REPEATS": {
+      "type": "integer",
+      "default": 5,
+      "minimum": 1
+    },
+    "FDR_THRESHOLD": {
+      "type": "number",
+      "default": 0.05,
+      "minimum": 0,
+      "maximum": 1
+    },
+    "FORMAL_MIN_UNITS_PER_CONDITION": {
+      "type": "integer",
+      "default": 3,
+      "minimum": 1
+    },
+    "PRELIMINARY_MIN_UNITS_PER_CONDITION": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 1
+    },
+    "MIN_RESIDUAL_DF": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 1
+    },
+    "CALIBRATION_REGISTRY": {
+      "type": "string",
+      "default": "../validation/calibration_registry.json"
+    },
+    "ALLOW_UNCALIBRATED_DEVELOPMENT": {
+      "type": "boolean",
+      "default": false
+    },
+    "WEIGHT_COLUMN": {
+      "type": "string",
+      "default": "weight"
+    },
+    "WEIGHT_CONVENTION": {
+      "type": "string",
+      "default": "multiplicative",
+      "enum": [
+        "multiplicative",
+        "divisive"
+      ]
+    },
+    "LEGACY_WEIGHT_VALIDATION": {
+      "type": "string",
+      "default": "reject",
+      "enum": [
+        "reject",
+        "finite_positive"
+      ]
+    },
+    "SADDLE_PARTITION_SOURCE": {
+      "type": "string",
+      "default": "replicate_rank_mean",
+      "enum": [
+        "replicate_rank_mean",
+        "external",
+        "all_sample_pool"
+      ]
+    },
+    "SADDLE_REFERENCE_TRACK": {
+      "type": "string",
+      "default": ""
+    },
+    "MIN_PHASING_CORRELATION": {
+      "type": "number",
+      "default": 0.1,
+      "minimum": 0,
+      "maximum": 1
+    },
+    "MAX_DENSE_BINS": {
+      "type": "integer",
+      "default": 12000,
+      "minimum": 1
+    },
+    "PIXEL_CHUNKSIZE": {
+      "type": "integer",
+      "default": 1000000,
+      "minimum": 1
+    },
+    "MIN_FREE_DISK_MB": {
+      "type": "integer",
+      "default": 1000,
+      "minimum": 1
+    },
+    "TOTAL_CPUS": {
+      "type": "integer",
+      "default": 24,
+      "minimum": 1
+    },
+    "MAX_MEMORY_MB": {
+      "type": "integer",
+      "default": 160000,
+      "minimum": 1
+    },
+    "MAX_PARALLEL_JOBS": {
+      "type": "integer",
+      "default": 8,
+      "minimum": 1
+    },
+    "MAX_PARALLEL_SAMPLES": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 1
+    },
+    "MAX_PARALLEL_MATRIX": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 1
+    },
+    "MAX_PARALLEL_IO": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1
+    },
+    "THREADS_QC": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 1
+    },
+    "MEMORY_MB_QC": {
+      "type": "integer",
+      "default": 16000,
+      "minimum": 1
+    },
+    "THREADS_POOL": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 1
+    },
+    "MEMORY_MB_POOL": {
+      "type": "integer",
+      "default": 32000,
+      "minimum": 1
+    },
+    "THREADS_BALANCE": {
+      "type": "integer",
+      "default": 8,
+      "minimum": 1
+    },
+    "MEMORY_MB_BALANCE": {
+      "type": "integer",
+      "default": 64000,
+      "minimum": 1
+    },
+    "THREADS_COMPARTMENTS": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 1
+    },
+    "MEMORY_MB_COMPARTMENTS": {
+      "type": "integer",
+      "default": 16000,
+      "minimum": 1
+    },
+    "THREADS_INSULATION": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 1
+    },
+    "MEMORY_MB_INSULATION": {
+      "type": "integer",
+      "default": 24000,
+      "minimum": 1
+    },
+    "THREADS_LOOPS": {
+      "type": "integer",
+      "default": 8,
+      "minimum": 1
+    },
+    "MEMORY_MB_LOOPS": {
+      "type": "integer",
+      "default": 64000,
+      "minimum": 1
+    },
+    "THREADS_HICREP": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 1
+    },
+    "MEMORY_MB_HICREP": {
+      "type": "integer",
+      "default": 32000,
+      "minimum": 1
+    },
+    "THREADS_QUANTIFY": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 1
+    },
+    "MEMORY_MB_QUANTIFY": {
+      "type": "integer",
+      "default": 16000,
+      "minimum": 1
+    },
+    "THREADS_AGGREGATES": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 1
+    },
+    "MEMORY_MB_AGGREGATES": {
+      "type": "integer",
+      "default": 32000,
+      "minimum": 1
+    },
+    "THREADS_DIFFERENTIAL": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1
+    },
+    "MEMORY_MB_DIFFERENTIAL": {
+      "type": "integer",
+      "default": 16000,
+      "minimum": 1
+    },
+    "THREADS_DEPTH_SENSITIVITY": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 1
+    },
+    "MEMORY_MB_DEPTH_SENSITIVITY": {
+      "type": "integer",
+      "default": 64000,
+      "minimum": 1
+    },
+    "THREADS_REPORT": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1
+    },
+    "MEMORY_MB_REPORT": {
+      "type": "integer",
+      "default": 4000,
+      "minimum": 1
+    },
+    "THREADS_PREFLIGHT": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1
+    },
+    "MEMORY_MB_PREFLIGHT": {
+      "type": "integer",
+      "default": 4000,
+      "minimum": 1
+    },
+    "RUN_TADS": {
+      "type": "boolean",
+      "default": true
+    },
+    "AGGREGATE_MODULES": {
+      "type": "string",
+      "default": "apa,ada,saddle"
+    },
+    "INSULATION_BOUNDARY_THRESHOLD": {
+      "type": "string",
+      "default": "Li"
+    },
+    "TAD_MIN_LENGTH_BP": {
+      "type": "integer",
+      "default": 30000,
+      "minimum": 1
+    },
+    "TAD_MAX_LENGTH_BP": {
+      "type": "integer",
+      "default": 3000000,
+      "minimum": 1
+    },
+    "TAD_BOUNDARY_TOLERANCE_BP": {
+      "type": "integer",
+      "default": 10000,
+      "minimum": 0
+    },
+    "TAD_MIN_REPLICATE_FRACTION": {
+      "type": "number",
+      "default": 0.67,
+      "minimum": 0.01,
+      "maximum": 1
+    },
+    "TAD_MIN_RECIPROCAL_OVERLAP": {
+      "type": "number",
+      "default": 0.5,
+      "minimum": 0.01,
+      "maximum": 1
+    },
+    "TAD_SIZE_CHANGE_BP": {
+      "type": "integer",
+      "default": 20000,
+      "minimum": 0
+    },
+    "TAD_SIZE_CHANGE_FRACTION": {
+      "type": "number",
+      "default": 0.1,
+      "minimum": 0,
+      "maximum": 1
+    },
+    "TAD_STRENGTH_CHANGE": {
+      "type": "number",
+      "default": 0.25,
+      "minimum": 0
+    },
+    "TAD_SENSITIVITY_THRESHOLDS": {
+      "type": "string",
+      "default": "0,0.2,0.5"
+    },
+    "PLOT_LOOP_VOLCANO": {
+      "type": "boolean",
+      "default": true
+    },
+    "VOLCANO_MIN_ABS_LOG2_EFFECT": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0
+    },
+    "VOLCANO_LABEL_TOP_N": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 20,
+      "default": 5
+    }
+  },
+  "required": [
+    "PIPELINE_NAME",
+    "SCHEMA_VERSION",
+    "PROJECT",
+    "ANALYSIS_SET_ID",
+    "RUN_ID",
+    "REFERENCE_ID",
+    "ANALYSIS_MODE",
+    "SAMPLESHEET",
+    "TECHNICAL_MEMBERSHIP",
+    "COMPARISONS",
+    "REFERENCE_REGISTRY",
+    "INDEPENDENT_FEATURES_REGISTRY",
+    "OUTDIR",
+    "SCRATCH_ROOT",
+    "RANDOM_SEED",
+    "PYTHON_BOOTSTRAP",
+    "CONDA_EXE",
+    "ENVIRONMENT_MODE",
+    "CORE_ENV_PREFIX",
+    "HICREP_ENV_PREFIX",
+    "DIFF_R_ENV_PREFIX",
+    "CORE_LOCK",
+    "HICREP_LOCK",
+    "DIFF_R_LOCK",
+    "R_SCRIPT",
+    "RUN_QC",
+    "RUN_HICREP",
+    "RUN_POOL",
+    "POOL_MODE",
+    "POOLS_MANIFEST",
+    "RUN_DEPTH_SENSITIVITY",
+    "DEPTH_SENSITIVITY_MODE",
+    "BALANCE_NEW_DERIVED_MAPS",
+    "RUN_COMPARTMENTS",
+    "RUN_INSULATION",
+    "RUN_LOOPS",
+    "RUN_AGGREGATES",
+    "RUN_DIFFERENTIAL",
+    "RUN_FINAL_REPORT",
+    "KEEP_POOLED_MAPS",
+    "KEEP_DOWNSAMPLED_MAPS",
+    "CLEAN_SCRATCH_ON_SUCCESS",
+    "COMPARTMENT_RESOLUTION",
+    "INSULATION_RESOLUTION",
+    "INSULATION_WINDOWS_BP",
+    "INSULATION_PRIMARY_WINDOW_BP",
+    "INSULATION_MIN_VALID_PIXEL_FRACTION",
+    "INSULATION_IGNORE_DIAGS",
+    "LOOP_RESOLUTION",
+    "LOOP_SENSITIVITY_RESOLUTIONS",
+    "FINE_RESOLUTION_QC_APPROVED",
+    "LOOP_CALLER",
+    "LOOP_MIN_DISTANCE_BP",
+    "LOOP_MAX_DISTANCE_BP",
+    "LOOP_CONSENSUS_TOLERANCE_BINS",
+    "LOOP_COUNT_WINDOW_BINS",
+    "LOOP_MIN_TOTAL_COUNT",
+    "LOOP_MIN_MEAN_COUNT_AT_MIN_EXPOSURE",
+    "LOOP_MIN_FEATURES_FORMAL",
+    "LOOP_NORMALIZATION",
+    "PS_RESOLUTION",
+    "HICREP_RESOLUTION",
+    "HICREP_MAX_DISTANCE_BP",
+    "HICREP_SMOOTHING_BINS",
+    "DOWNSAMPLING_REPEATS",
+    "FDR_THRESHOLD",
+    "FORMAL_MIN_UNITS_PER_CONDITION",
+    "PRELIMINARY_MIN_UNITS_PER_CONDITION",
+    "MIN_RESIDUAL_DF",
+    "CALIBRATION_REGISTRY",
+    "ALLOW_UNCALIBRATED_DEVELOPMENT",
+    "WEIGHT_COLUMN",
+    "WEIGHT_CONVENTION",
+    "LEGACY_WEIGHT_VALIDATION",
+    "SADDLE_PARTITION_SOURCE",
+    "SADDLE_REFERENCE_TRACK",
+    "MIN_PHASING_CORRELATION",
+    "MAX_DENSE_BINS",
+    "PIXEL_CHUNKSIZE",
+    "MIN_FREE_DISK_MB",
+    "TOTAL_CPUS",
+    "MAX_MEMORY_MB",
+    "MAX_PARALLEL_JOBS",
+    "MAX_PARALLEL_SAMPLES",
+    "MAX_PARALLEL_MATRIX",
+    "MAX_PARALLEL_IO",
+    "THREADS_QC",
+    "MEMORY_MB_QC",
+    "THREADS_POOL",
+    "MEMORY_MB_POOL",
+    "THREADS_BALANCE",
+    "MEMORY_MB_BALANCE",
+    "THREADS_COMPARTMENTS",
+    "MEMORY_MB_COMPARTMENTS",
+    "THREADS_INSULATION",
+    "MEMORY_MB_INSULATION",
+    "THREADS_LOOPS",
+    "MEMORY_MB_LOOPS",
+    "THREADS_HICREP",
+    "MEMORY_MB_HICREP",
+    "THREADS_QUANTIFY",
+    "MEMORY_MB_QUANTIFY",
+    "THREADS_AGGREGATES",
+    "MEMORY_MB_AGGREGATES",
+    "THREADS_DIFFERENTIAL",
+    "MEMORY_MB_DIFFERENTIAL",
+    "THREADS_DEPTH_SENSITIVITY",
+    "MEMORY_MB_DEPTH_SENSITIVITY",
+    "THREADS_REPORT",
+    "MEMORY_MB_REPORT",
+    "THREADS_PREFLIGHT",
+    "MEMORY_MB_PREFLIGHT",
+    "PLOT_LOOP_VOLCANO",
+    "VOLCANO_MIN_ABS_LOG2_EFFECT",
+    "VOLCANO_LABEL_TOP_N"
+  ],
+  "additionalProperties": true
+}

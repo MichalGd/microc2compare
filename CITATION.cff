@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "Cite the reviewed microc2compare release and the scientific tools it uses. Authorship/identifiers await approval."
+title: "microc2compare"
+type: software
+version: "0.2.5"
+date-released: "2026-10-08"
+authors:
+  - name: "microc2compare contributors"
+abstract: "Shell-coordinated replicate-aware comparison of existing Micro-C/Hi-C matrices; initial validation candidate."

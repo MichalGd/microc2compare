@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "pool_id",
+      "pool_scope",
+      "condition",
+      "member_sample_ids",
+      "reference_id",
+      "matrix_path",
+      "provenance_path"
+    ],
+    "properties": {
+      "pool_id": {
+        "type": "string"
+      },
+      "pool_scope": {
+        "type": "string"
+      },
+      "condition": {
+        "type": "string"
+      },
+      "member_sample_ids": {
+        "type": "string"
+      },
+      "reference_id": {
+        "type": "string"
+      },
+      "matrix_path": {
+        "type": "string"
+      },
+      "provenance_path": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": true
+  }
+}

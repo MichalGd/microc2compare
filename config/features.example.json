@@ -1,0 +1,12 @@
+{
+  "feature_set_id": "independent_reference_loops",
+  "path": "/immutable/features/independent.10kb.bedpe.tsv",
+  "sha256": "REPLACE_WITH_REAL_SHA256",
+  "reference_id": "reference",
+  "resolution": 10000,
+  "coordinate_convention": "0-based-half-open",
+  "source": "REPLACE_WITH_PRIMARY_DISCOVERY_SOURCE_AND_EXACT_ACCESSIONS",
+  "discovery_samples": ["independent_discovery_sample"],
+  "independent_of_analysis_samples": true,
+  "independence_evidence": "REPLACE_WITH_INSPECTABLE_BIOLOGICAL_DISCOVERY_AND_SELECTION_EVIDENCE"
+}

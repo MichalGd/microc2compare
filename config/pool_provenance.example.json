@@ -1,0 +1,12 @@
+{
+  "reference_id": "reference",
+  "count_units": "unique_contacts",
+  "summation": "raw_integer_sum",
+  "member_sample_ids": ["C1", "C2", "C3"],
+  "member_hashes": {"C1": "REPLACE_WITH_MATRIX_SHA256", "C2": "REPLACE_WITH_MATRIX_SHA256", "C3": "REPLACE_WITH_MATRIX_SHA256"},
+  "filters": {"mapq": 30, "min_distance_bp": 1000, "chromosome_policy": "registered_assembly_chromosomes"},
+  "balancing": {
+    "10000": {"weight_column": "weight", "convention": "multiplicative", "converged": true, "recipe": {"method": "REPLACE_WITH_ACTUAL_POOL_RECIPE"}},
+    "100000": {"weight_column": "weight", "convention": "multiplicative", "converged": true, "recipe": {"method": "REPLACE_WITH_ACTUAL_POOL_RECIPE"}}
+  }
+}

@@ -26,7 +26,10 @@ jobs:
           conda env create -p "$RUNNER_TEMP/m2c-core" -f environment.yml
           conda env create -p "$RUNNER_TEMP/m2c-hicrep" -f envs/hicrep.yml
           # Unit tests invoke both adapters directly in one CI-owned test prefix.
-          conda run -p "$RUNNER_TEMP/m2c-core" python -m pip install --no-deps hicrep==0.2.6
+          # Core already pins its numeric dependencies; install HiCRep's remaining
+          # dependency chain explicitly without replacing those scientific pins.
+          conda run -p "$RUNNER_TEMP/m2c-core" python -m pip install --no-deps hicrep==0.2.6 Deprecated==1.3.1 wrapt==2.5.0
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-core" python -c 'from hicrep.hicrep import hicrepSCC'
       - name: Shell and numerical tests
         run: |
           bash scripts/ci_checks.sh

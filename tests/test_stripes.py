@@ -1,7 +1,11 @@
 """Adapter tests and an optional actual pinned-StripePy CPU acceptance test."""
 from pathlib import Path
 import importlib.metadata
+import json
+import os
+import subprocess
 import sys
+import tempfile
 from types import SimpleNamespace
 
 import cooler
@@ -139,11 +143,66 @@ def has_real_caller():
     except importlib.metadata.PackageNotFoundError:return False
 
 
+@pytest.mark.skipif(os.name != "posix", reason="AF_UNIX multiprocessing paths are POSIX-specific")
+@pytest.mark.parametrize("inherited", ["short", "deep_ascii", "deep_unicode"])
+def test_real_manager_socket_under_inherited_temp_and_private_cleanup(tmp_path, monkeypatch, inherited):
+    # A short explicitly inherited root must be honored. Long and multibyte
+    # roots exercise the pipeline failure while leaving parent scratch intact.
+    with tempfile.TemporaryDirectory(prefix="m2c-test-", dir="/tmp") as owned:
+        root = Path(owned)
+        if inherited != "short":
+            root /= "stage-scratch-" * 9 if inherited == "deep_ascii" else "\u03bb" * 45
+            root.mkdir()
+        for key in ("TMPDIR", "TMP", "TEMP"):
+            monkeypatch.setenv(key, str(root))
+        monkeypatch.setattr(tempfile, "tempdir", str(root))
+        output = tmp_path / "ipc.json"
+        script = (
+            "import json,multiprocessing as mp,os,stat,tempfile\n"
+            "if __name__ == '__main__':\n"
+            " with mp.Manager() as manager:\n"
+            "  value=manager.dict(answer=42)\n"
+            "  print(json.dumps(dict(tmp=tempfile.gettempdir(),"
+            "variables=[os.environ[key] for key in ('TMPDIR','TMP','TEMP')],"
+            "mode=stat.S_IMODE(os.stat(tempfile.gettempdir()).st_mode),"
+            "address=manager.address,answer=value['answer'])))\n"
+        )
+        module.run_caller([sys.executable, "-c", script], output)
+        value = json.loads(output.read_text())
+        temporary = Path(value["tmp"])
+        assert value["answer"] == 42 and value["mode"] == 0o700
+        assert value["variables"] == [str(temporary)] * 3
+        assert len(os.fsencode(value["address"])) <= 103
+        assert temporary.parent == (root.resolve() if inherited == "short" else Path("/tmp").resolve())
+        assert not temporary.exists() and root.is_dir()
+        assert tempfile.tempdir == str(root)
+        assert all(os.environ[key] == str(root) for key in ("TMPDIR", "TMP", "TEMP"))
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Private POSIX caller temporary directory")
+def test_caller_private_temp_cleanup_on_failure(tmp_path, monkeypatch):
+    inherited = tmp_path / ("stage-scratch-" * 9)
+    inherited.mkdir()
+    monkeypatch.setenv("TMPDIR", str(inherited))
+    output = tmp_path / "failed-ipc.json"
+    with pytest.raises(subprocess.CalledProcessError):
+        module.run_caller([sys.executable, "-c",
+            "import json,os; print(json.dumps(os.environ['TMPDIR'])); raise SystemExit(17)"], output)
+    temporary = Path(json.loads(output.read_text()))
+    assert not temporary.exists() and inherited.is_dir()
+    assert os.environ["TMPDIR"] == str(inherited)
+
+
 @pytest.mark.skipif(not has_real_caller(),reason="Optional pinned StripePy environment is not installed")
 @pytest.mark.parametrize("threads", [1, 2])
 def test_actual_stripepy_cli_on_fresh_masked_map(tmp_path,monkeypatch,threads):
     c,_,_,_,_,_,source=fixture(tmp_path,monkeypatch,n=160)
     c["THREADS_STRIPES"] = threads
+    if os.name == "posix":
+        inherited = tmp_path / ("stage-scratch-" * 9)
+        inherited.mkdir()
+        for key in ("TMPDIR", "TMP", "TEMP"):
+            monkeypatch.setenv(key, str(inherited))
     before=file_hash(source)
     outputs=module.stripes(c,"fresh")
     assert all(p.exists() and p.stat().st_size for p in outputs)

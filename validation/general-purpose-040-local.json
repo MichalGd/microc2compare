@@ -72,8 +72,9 @@
       "older_bundles_preserved": true,
       "native_caller_numpy": "2.4.6",
       "core_numpy": "1.26.4",
-      "acceptance_record_sha256": "c22a221a94055b83d1de3ece7804be54ef3a02b70a0c0fed59aee9e863f38356",
-      "native_caller_scipy": "1.17.1"
+      "acceptance_record_sha256": "7e7c83c1a381499fe0097239decc455167b7709fd015b826438eaddf97c7099a",
+      "native_caller_scipy": "1.17.1",
+      "completion_records_after_POSIX_IPC_fix": "passed"
     }
   },
   "optional_caller_isolation": {
@@ -147,5 +148,35 @@
       "browser_workflow": "early runtime-directory step with GITHUB_ENV; YAML and space-containing path initialization smoke passed"
     },
     "updated_hosted_checks": "pending on revised commit"
+  },
+  "hosted_CI_second_commit": {
+    "commit": "8605a236ab1720d3c498340b56b79a84647e97d4",
+    "fine_loop_job": "passed; actual Mustache/Chromosight APIs, new CPU/pairs paths, full and selected fine workflow, immutable inputs",
+    "r_adapter_job": "passed; effect and exposure-offset numerical checks, not biological calibration",
+    "core_suite": {
+      "passed": 366,
+      "skipped": 12,
+      "failed": 4,
+      "seconds": 243.65
+    },
+    "corrections": {
+      "core_test_prefix": "Explicit HiCRep 0.2.6 / Deprecated 1.3.1 / wrapt 2.5.0 in the CI-owned prefix; user scientific environments unchanged.",
+      "missing_phasing_fixture": "Host-compatible RAM request so the intended missing-phasing guard is reached.",
+      "masked_cooltools_fixture": "Explicit mixed chromosome scope and 10-kb compartment/phasing grid on 2-Mb views; unchanged minimum eligible-bin guard.",
+      "browser_recipe": "SciPy 1.17.1, available and compatible with the isolated Python/NumPy recipe.",
+      "stripe_POSIX_IPC": "Caller-child-only short private temporary directory prevents AF_UNIX path overflow; success/failure cleanup and parent environment preservation tested."
+    },
+    "local_corrective_checks": {
+      "required_saddles_and_workflow": {
+        "passed": 18,
+        "seconds": 30.67
+      },
+      "actual_stripe_caller": {
+        "passed": 7,
+        "POSIX_only_skipped_on_Windows": 4,
+        "seconds": 10.31
+      }
+    },
+    "next_hosted_revision": "pending; previous successful jobs do not establish corrected-core/browser/stripe acceptance"
   }
 }

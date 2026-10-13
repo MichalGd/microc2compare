@@ -53,6 +53,8 @@ For conversion within the workflow, register this optional prefix with `BROWSER_
 
 The recipe pins UCSC `bedGraphToBigWig` 482, Clodius 0.22.2 and pyBigWig 0.3.26. Clodius 0.22.2 requires Python 3.12 or newer; pyBigWig 0.3.26 supports Python 3.9 or newer and provides Linux wheels. This is an optional conversion recipe, not a tested HiGlass server/client lock. Those requirements are recorded by the primary [Clodius package metadata](https://pypi.org/project/clodius/0.22.2/), [pyBigWig package metadata](https://pypi.org/project/pyBigWig/0.3.26/) and [Bioconda UCSC recipe](https://github.com/bioconda/bioconda-recipes/blob/master/recipes/ucsc-bedgraphtobigwig/meta.yaml).
 
+The browser recipe uses SciPy 1.17.1 with Python 3.12 and NumPy 2.2.6. Its [tagged release metadata](https://github.com/scipy/scipy/blob/v1.17.1/pyproject.toml) requires Python 3.11 or newer and NumPy 1.26.4 or newer below 2.7, covering these pins. The earlier SciPy 1.15.3 pin was unavailable to the actual Linux CI solve; successful solving and conversion still require the CI acceptance run.
+
 The exporter uses the documented formats and command families:
 
 ```bash

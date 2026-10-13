@@ -55,7 +55,8 @@ def test_missing_phasing_fails_preflight_before_contact_scan(tmp_path,config,mon
     atomic_json(data/'references.json',registry)
     env=values(config);env.update(M2C_ANALYSES='saddle',PROJECT='demo',REFERENCE_ID='demo',SAMPLESHEET='samples.csv',
                                  TECHNICAL_MEMBERSHIP='technical_membership.tsv',REFERENCE_REGISTRY='references.json',
-                                 OUTDIR='results',SCRATCH_ROOT='scratch',TOTAL_CPUS='2',MAX_MEMORY_MB='16000')
+                                 OUTDIR='results',SCRATCH_ROOT='scratch',TOTAL_CPUS='2',MAX_MEMORY_MB='2000',
+                                 THREADS_PREFLIGHT='1',MEMORY_MB_PREFLIGHT='1000')
     c=normalize(env,data)
     monkeypatch.setattr(science,'domain',lambda *args:pytest.fail('Contact scans must not precede required phasing validation'))
     with pytest.raises(ContractError,match='registered fixed phasing track'):science.inspect_inputs(c)

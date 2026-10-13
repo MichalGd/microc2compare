@@ -6,6 +6,7 @@ zero-based half-open genomic intervals, and retain those native bounds explicitl
 from __future__ import annotations
 
 import importlib.metadata
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import subprocess
@@ -108,13 +109,40 @@ def caller_command(*args):
     return [sys.executable, "-m", "stripepy.main", *map(str, args)]
 
 
-def run_caller(command, stdout_path=None):
+@contextmanager
+def caller_environment():
+    """Keep POSIX multiprocessing sockets short without changing task scratch."""
     environment = dict(os.environ, STRIPEPY_NO_TELEMETRY="1", OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
-    if stdout_path is None:
-        subprocess.run(command, check=True, env=environment)
-    else:
-        with Path(stdout_path).open("w", encoding="utf-8", newline="") as handle:
-            subprocess.run(command, check=True, env=environment, stdout=handle)
+    if os.name != "posix":
+        yield environment
+        return
+    # Linux permits 107 address bytes plus NUL; some POSIX systems permit only
+    # 103. Reserve 35 bytes for /pymp-XXXXXXXX/listener-XXXXXXXX and the
+    # mkdtemp prefix/random suffix before accepting an inherited base directory.
+    prefix = "m2c-ipc-"
+    parent = None
+    for candidate in (*[environment.get(key) for key in ("TMPDIR", "TMP", "TEMP")], "/tmp"):
+        if not candidate:
+            continue
+        path = Path(candidate).resolve()
+        if (len(os.fsencode(path)) + 1 + len(prefix) + 8 + 35 <= 103 and
+                path.is_dir() and os.access(path, os.W_OK | os.X_OK)):
+            parent = path
+            break
+    require(parent is not None, "StripePy requires a writable short POSIX temporary directory for multiprocessing sockets")
+    with tempfile.TemporaryDirectory(prefix=prefix, dir=parent) as temporary:
+        os.chmod(temporary, 0o700)
+        environment.update(TMPDIR=temporary, TMP=temporary, TEMP=temporary)
+        yield environment
+
+
+def run_caller(command, stdout_path=None):
+    with caller_environment() as environment:
+        if stdout_path is None:
+            subprocess.run(command, check=True, env=environment)
+        else:
+            with Path(stdout_path).open("w", encoding="utf-8", newline="") as handle:
+                subprocess.run(command, check=True, env=environment, stdout=handle)
 
 
 def canonicalize(native, segment, location, sample, resolution, c):

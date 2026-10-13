@@ -38,6 +38,13 @@ so its usual 2 Mb chromosome cutoff cannot silently discard the segments. This
 conservative analysis excludes stripes crossing gaps: no retained calls does
 not establish biological absence or complete genome coverage.
 
+On POSIX systems the caller also receives a private temporary directory with
+permissions `0700` for its multiprocessing sockets. A sufficiently short
+inherited temporary root is honored; deeply nested roots fall back to `/tmp`
+to stay within Unix socket path limits. Only the child receives these temporary
+environment variables. The directory is removed after success or failure;
+scientific scratch and matrix paths retain their registered locations.
+
 `THREADS_STRIPES` sets caller CPU processes. `STRIPE_GENOMIC_BELT_BP` and
 `STRIPE_MAX_WIDTH_BP` are physical lengths. The pinned caller supplies its other
 published defaults. Local CPU time and memory must be measured; the published

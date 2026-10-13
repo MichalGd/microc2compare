@@ -185,6 +185,7 @@ def chromosight_scores(c, scope):
     from scipy.sparse import csr_matrix
     from chromosight.utils.detection import normxcorr2
     from .science import context, oe_window, save
+    from .analyses import has_loop_discovery
     from .resolutions import quantification_resolutions
     version=importlib.metadata.version("chromosight")
     require(version=="1.6.3", "Chromosight adapter requires tested chromosight 1.6.3")
@@ -197,7 +198,7 @@ def chromosight_scores(c, scope):
         expected, expected_source = _expected_for(c,scope,resolution,clr,bins,mask,labels,views,values)
         directory=root/f"04_quantification/chromosight/{resolution}"
         source=root/f"04_quantification/discovered_loops/{resolution}/counts.tsv"
-        if not c["RUN_LOOPS"]: source=root/f"04_quantification/independent_loops/{resolution}/counts.tsv"
+        if not has_loop_discovery(c): source=root/f"04_quantification/independent_loops/{resolution}/counts.tsv"
         features=pd.read_csv(source,sep="\t")
         reader = _reader_factory(clr)
         per_worker = (kernel.shape[0]+2)**2*8*32

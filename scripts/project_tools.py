@@ -273,7 +273,8 @@ def run_action(action, c, config, out=None, run_id=None, overrides=()):
         require(c['MEMORY_MB_BALANCE'] <= c['MAX_MEMORY_MB'], 'MEMORY_MB_BALANCE exceeds MAX_MEMORY_MB')
         require(limits['available_memory_bytes'] is None or c['MEMORY_MB_BALANCE']*1000000 <= limits['available_memory_bytes'], 'Insufficient available memory for the configured balancing reservation')
         prepare_from_pairs(dict(c, THREADS_BALANCE=threads), out, resolution_set(c))
-        variant(config, {'SAMPLESHEET': out / 'samples.tsv', 'MATRIX_REGISTRY': out / 'matrix_registry.json'}, 'pairs-grids')
+        variant(config, {'SAMPLESHEET': out / 'samples.tsv', 'MATRIX_REGISTRY': out / 'matrix_registry.json',
+                         'WEIGHT_COLUMN': 'weight', 'WEIGHT_CONVENTION': 'multiplicative'}, 'pairs-grids')
     elif action == 'demo':
         conf = script('generate_demo').generate(out, raw_only=True)
         print('Generated six synthetic biological-sample maps; these are software fixtures, not real biological data.')

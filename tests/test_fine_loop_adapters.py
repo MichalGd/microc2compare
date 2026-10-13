@@ -74,6 +74,45 @@ def test_both_strands_all_overlaps_and_ccre_evidence(tmp_path,config):
     assert result.nearest_tss_signed_distance_bp.iloc[2]<0
 
 
+@pytest.mark.parametrize('mode',['chromosight','mustache','both'])
+def test_discovery_catalogue_supplies_real_annotations_without_external_universe(tmp_path,config,monkeypatch,mode):
+    from microc2compare.annotation import run
+    assembly,chrom='new_annotation_assembly','contigNovel'
+    sizes=tmp_path/'sizes.tsv';sizes.write_text(f'{chrom}\t100000\n')
+    views=tmp_path/'views.bed';views.write_text(f'{chrom}\t0\t100000\t{chrom}\n')
+    reference=tmp_path/'reference.json'
+    atomic_json(reference,{'reference_id':assembly,'chromsizes':str(sizes),'chromsizes_sha256':file_hash(sizes),
+                          'views':str(views),'views_sha256':file_hash(views),'chromosome_classes':{'autosomes':[chrom],'sex':[]}})
+    gtf=tmp_path/'genes.gtf'
+    gtf.write_text(f'{chrom}\tx\tgene\t1001\t5000\t.\t+\t.\tgene_id "A"; gene_name "Alpha";\n'
+                   f'{chrom}\tx\texon\t1001\t1200\t.\t+\t.\tgene_id "A";\n')
+    ccre=tmp_path/'ccre.bed';ccre.write_text(f'{chrom}\t20000\t22000\tnewEnhancer\tdELS\n')
+    registry=tmp_path/'annotation.json'
+    atomic_json(registry,{'reference_id':assembly,'gtf':str(gtf),'gtf_sha256':file_hash(gtf),'gtf_release':'new-test-release',
+                         'ccre':str(ccre),'ccre_sha256':file_hash(ccre),'ccre_source':'declared-test-source'})
+    config.update(run_dir=str(tmp_path/'run'),REFERENCE_ID=assembly,REFERENCE_REGISTRY=str(reference),ANNOTATION_REGISTRY=str(registry),
+                  RUN_COMPARTMENTS=False,RUN_LOOPS=mode in ('mustache','both'),RUN_CHROMOSIGHT_DISCOVERY=mode in ('chromosight','both'),
+                  INDEPENDENT_FEATURES_REGISTRY='')
+    native=pd.DataFrame([[chrom,0,2000,chrom,20000,22000,'native_call']],columns=LOOP_COLUMNS)
+    native['caller']='chromosight' if mode=='chromosight' else 'mustache'
+    catalogue,_=cross_resolution_catalogue(config,[('fresh-observation',2000,native)])
+    catalogue_path=science.save(catalogue,Path(config['run_dir'])/'03_features/loops/catalogue.tsv')
+    originals=[sizes,views,reference,gtf,ccre,registry,catalogue_path]
+    before={str(path):file_hash(path) for path in originals}
+    def forbidden(*args,**kwargs):pytest.fail('An enabled discovery catalogue must not consult an external universe')
+    monkeypatch.setattr(science,'external_features',forbidden)
+    monkeypatch.setattr(science,'validate_metadata',forbidden)
+    outputs=run(config,'run')
+    loops=pd.read_csv(Path(config['run_dir'])/'03_features/annotation/loops.tsv',sep='\t')
+    anchors=pd.read_csv(Path(config['run_dir'])/'03_features/annotation/anchors.tsv',sep='\t')
+    assert loops.feature_id.tolist()==catalogue.feature_id.tolist()
+    assert loops.candidate_category.tolist()==['promoter_enhancer_like'] and len(anchors)==2
+    assert loops.anchor1_promoter_gene_ids.tolist()==['A'] and loops.anchor2_ccre_all_ids.tolist()==['newEnhancer']
+    assert loops[['anchor1_start','anchor1_end','anchor2_start','anchor2_end']].iloc[0].tolist()==[0,2000,20000,22000]
+    assert all(path.is_file() for path in outputs)
+    assert before=={str(path):file_hash(path) for path in originals}
+
+
 def test_effective_view_change_rejected_before_writing_saved_metadata(tmp_path,config):
     sizes=tmp_path/'sizes';sizes.write_text('chr1\t100000\n');views=tmp_path/'views';views.write_text('chr1\t0\t100000\tchr1\n')
     registry=tmp_path/'ref.json';atomic_json(registry,{'reference_id':'mm39','chromsizes':str(sizes),'views':str(views),'chromosome_classes':{'autosomes':['chr1']}})

@@ -54,7 +54,7 @@ def test_mixed_scope_fixture_registers_saddle_eligible_grid(tmp_path):
     for view_id in np.unique(archive['labels']):
         assert ((archive['labels']==view_id)&archive['mask']).sum()>=50
     phase=pd.read_csv(root/'phasing.bedgraph',sep='\t',header=None,names=['chrom','start','end','value'])
-    assert base.merge(phase,on=['chrom','start','end'],validate='one_to_one').value.notna().all()
+    assert base.merge(phase,on=['chrom','start','end'],how='left',validate='one_to_one').value.notna().all()
     excluded=(base.chrom=='chrX')&(base.start==100000)&(base.end==110000)
     assert excluded.sum()==1 and not archive['mask'][excluded.to_numpy()].any()
 

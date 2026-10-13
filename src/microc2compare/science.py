@@ -594,7 +594,17 @@ def saddle_partition(c, samples):
         joined=base.merge(track,on=["chrom","start","end"],how="left",validate="one_to_one")
         tracks=[joined.oriented_score.to_numpy()]
     else:
-        ids=["pool__"+p["pool_id"] for p in read_json(root/"02_pools/registry.json")["pools"] if p["pool_scope"]=="all_samples"] if c["SADDLE_PARTITION_SOURCE"]=="all_sample_pool" else [s["sample_id"] for s in samples]
+        if c["SADDLE_PARTITION_SOURCE"]=="all_sample_pool":
+            ids=["pool__"+p["pool_id"] for p in read_json(root/"02_pools/registry.json")["pools"] if p["pool_scope"]=="all_samples"]
+        else:
+            ids=[s["sample_id"] for s in samples]
+            require(len(ids)==len(set(ids)), "Saddle observation IDs must be unique")
+            manifest_order={s["sample_id"]:i for i,s in enumerate(validate_metadata(c)["samples"])}
+            require(set(ids)<=set(manifest_order), "Saddle observation IDs must belong to the current manifest")
+            # Floating-point rank means can differ at ties when tracks are added
+            # in another order. Preserve normal manifest-order numerics for every
+            # caller ordering before the existing coordinate tie-break.
+            ids.sort(key=manifest_order.__getitem__)
         require(ids,"Requested all-sample pool is unavailable")
         for sample in ids:
             table=pd.read_csv(root/f"03_features/compartments/{sample}.tsv",sep="\t")

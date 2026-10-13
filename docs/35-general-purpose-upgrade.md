@@ -4,7 +4,8 @@ The new modules operate on the current project's sample manifest, registered
 reference assets, native matrices and frozen run metadata. A completed mouse
 comparison, a prior loop-export bundle and particular observation names/counts
 are not prerequisites. Arbitrary reference identifiers are supported; their
-chromosome lengths, view scope and assembly-matched annotations must be supplied.
+chromosome lengths and view scope must be supplied. Assembly-matched annotations
+are required only when annotation is enabled.
 The example `mm39` default is a convenience, not an assembly restriction.
 
 ## Start a new project
@@ -125,6 +126,9 @@ Continuous condition means require compatible coordinates and the necessary
 orientation; missingness and contributions are retained. Discrete tracks use
 documented detection/consensus support rules. They never average coordinates or
 claim significant specificity. ADA conditions retain matching stable domain IDs.
+Compartment means use selected phased scores only; raw E1/E2/E3 components are
+exported per observation without condition averaging. Their saved scaling is
+preserved, so mean amplitude is not a quantitative compartment-strength estimate.
 The README, track inventory, source identities and checksums describe loading.
 UCSC files contain the appropriate custom-track headers.
 

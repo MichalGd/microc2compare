@@ -85,7 +85,7 @@ def configure_selection(c, request):
         rows = read_table(c["COMPARISONS"])
         # Formal loops quantify an independent universe; descriptive loops need
         # discovery unless a frozen external set was explicitly supplied.
-        c["RUN_LOOPS"] |= "loops" in modules and not c["INDEPENDENT_FEATURES_REGISTRY"] and any(
+        c["RUN_LOOPS"] |= "loops" in modules and not c["INDEPENDENT_FEATURES_REGISTRY"] and not c["RUN_CHROMOSIGHT_DISCOVERY"] and any(
             r["inference"] == "descriptive" and "loops" in r["modules"].split(";") for r in rows)
     if has_loop_discovery(c):
         c["RUN_QC"] = True

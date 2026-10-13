@@ -31,6 +31,30 @@ def test_explicit_both_callers_are_retained(config):
     assert selected["RUN_LOOPS"] and selected["RUN_CHROMOSIGHT_DISCOVERY"]
 
 
+@pytest.mark.parametrize("comparison",["loop_comparison","comparisons"])
+def test_chromosight_only_descriptive_comparisons_do_not_add_another_caller(tmp_path,config,comparison):
+    path=tmp_path/"comparisons.tsv"
+    rows=[{"comparison_id":"new_comparison","case_condition":"exposed","reference_condition":"baseline",
+           "design":"~condition","inference":"descriptive","modules":"loops"}]
+    write_table(path,rows,list(rows[0]))
+    config.update(COMPARISONS=str(path),INDEPENDENT_FEATURES_REGISTRY="")
+    selected=configure_selection(config,"chromosight_discovery,"+comparison)
+    assert selected["RUN_DIFFERENTIAL"] and selected["RUN_CHROMOSIGHT_DISCOVERY"]
+    assert not selected["RUN_LOOPS"] and enabled(selected,"quantify")
+
+
+def test_formal_comparison_selection_preserves_external_independent_universe(tmp_path,config):
+    path=tmp_path/"comparisons.tsv"
+    rows=[{"comparison_id":"formal_comparison","case_condition":"exposed","reference_condition":"baseline",
+           "design":"~condition","inference":"formal","modules":"loops"}]
+    write_table(path,rows,list(rows[0]))
+    independent=str(tmp_path/"reviewed-external-universe.json")
+    config.update(COMPARISONS=str(path),INDEPENDENT_FEATURES_REGISTRY=independent)
+    selected=configure_selection(config,"chromosight_discovery,loop_comparison")
+    assert selected["RUN_DIFFERENTIAL"] and not selected["RUN_LOOPS"]
+    assert selected["INDEPENDENT_FEATURES_REGISTRY"]==independent and enabled(selected,"quantify")
+
+
 def test_fresh_chromosight_only_central_stages(tmp_path, config):
     cooler = pytest.importorskip("cooler")
     h5py = pytest.importorskip("h5py")
@@ -89,7 +113,7 @@ def test_fresh_chromosight_only_central_stages(tmp_path, config):
                   LOOP_CALLER="mustache", LOOP_MIN_DISTANCE_BP="6000", LOOP_MAX_DISTANCE_BP="200000", MAX_DENSE_BINS="512",
                   CHROMOSIGHT_DISCOVERY_RESOLUTIONS="2000", CHROMOSIGHT_DISCOVERY_MIN_PEARSON="0.3",
                   TOTAL_CPUS="2", MAX_MEMORY_MB="4000", THREADS_CHROMOSIGHT="1", MEMORY_MB_CHROMOSIGHT="2000",
-                  RUN_FINAL_REPORT="true", M2C_ANALYSES="chromosight_discovery,quantify")
+                  RUN_FINAL_REPORT="true", M2C_ANALYSES="chromosight_discovery,quantify,chromosight")
     for kind in ("PREFLIGHT", "QC", "QUANTIFY", "REPORT"):
         values.update({f"THREADS_{kind}": "1", f"MEMORY_MB_{kind}": "2000"})
     c = normalize(values, tmp_path)
@@ -99,7 +123,7 @@ def test_fresh_chromosight_only_central_stages(tmp_path, config):
     resolved = root / "00_metadata/config.json"
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1",
                        MKL_NUM_THREADS="1", NUMEXPR_NUM_THREADS="1", TMP=str(tmp_path), TEMP=str(tmp_path))
-    for stage in ("preflight", "register", "qc", "chromosight_discovery", "consensus", "quantify", "report"):
+    for stage in ("preflight", "register", "qc", "chromosight_discovery", "consensus", "quantify", "chromosight", "report"):
         assert enabled(c, stage)
         for sid in scopes(c, stage):
             result = subprocess.run([sys.executable, "-I", "-B", str(REPO / "scripts/scientific.py"), stage,
@@ -120,6 +144,13 @@ def test_fresh_chromosight_only_central_stages(tmp_path, config):
     assert catalogue.biological_support.max() == 3
     counts = pd.read_csv(root / "04_quantification/discovered_loops/2000/counts.tsv", sep="\t")
     assert len(counts) and counts[[s["sample_id"] for s in samples]].notna().all().all()
+    target_id=counts.iloc[np.argmin(abs(counts.start1-55*resolution)+abs(counts.start2-95*resolution))].feature_id
+    for sample in samples:
+        scores=pd.read_csv(root/f"04_quantification/chromosight/2000/{sample['sample_id']}.tsv",sep="\t")
+        assert scores.feature_id.tolist()==counts.feature_id.tolist()
+        assert scores.sample_id.eq(sample['sample_id']).all()
+        target=scores.loc[scores.feature_id==target_id].iloc[0]
+        assert target.status=="measured" and np.isfinite(target.score) and target.score>.3
     report = (root / "08_reports/index.html").read_text(encoding="utf-8")
     assert "Multi-resolution loop catalogue" in report and "nova-A.2000.chromosight.tsv" in report
     assert "Mustache 1.3.3 suppresses" not in report

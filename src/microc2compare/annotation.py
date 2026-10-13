@@ -118,11 +118,12 @@ def annotate_anchors(anchors, genes, exons, ccre, c, ccre_enabled):
 
 def run(c,scope):
     from .science import save, external_features, validate_metadata
+    from .analyses import has_loop_discovery
     from .matrix import reference
     root=Path(c["run_dir"]);directory=root/"03_features/annotation"
     registry=resources(c);selected=reference(c)[0]["effective_scope"]["chromosomes"]
     catalogue=root/"03_features/loops/catalogue.tsv"
-    features=pd.read_csv(catalogue,sep="\t") if c["RUN_LOOPS"] else external_features(c,validate_metadata(c)["samples"])[0]
+    features=pd.read_csv(catalogue,sep="\t") if has_loop_discovery(c) else external_features(c,validate_metadata(c)["samples"])[0]
     anchors={};links=[]
     for f in features.itertuples():
         link={"feature_id":f.feature_id}

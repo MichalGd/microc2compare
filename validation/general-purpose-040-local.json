@@ -1,7 +1,7 @@
 {
   "version": "0.4.0",
   "created_utc": "2026-10-13T18:41:09.538223+00:00",
-  "status": "local_validation_candidate",
+  "status": "validation_candidate_chronological_evidence",
   "platform": "Windows-10-10.0.26200-SP0",
   "python": "3.11.9",
   "public_checkout_tests": {
@@ -123,13 +123,11 @@
   },
   "publication_scope": "Allowlisted public source/tests/examples/docs/schemas/environment recipes and nonprivate validation records only.",
   "pending_acceptance": [
-    "Linux core and optional runtime solves/execution",
-    "complete Mustache native runtime",
-    "real bigWig/beddb/bed2ddb converter acceptance",
+    "Final-source Linux core/fine checks at the timestamp of this record; consult the current GitHub branch checks",
     "HiGlass ingestion and installed client rendering",
     "72CPU/400GB target-server scaling and RSS/I/O measurements",
-    "representative real-data near-4kb loop sensitivity/false positives",
-    "real-data StripePy calibration and biological inference calibration"
+    "Representative real-data near-4kb loop sensitivity/false positives",
+    "Real-data StripePy calibration and biological inference calibration"
   ],
   "scientific_limits": [
     "Adapted CPU methods, not exact Hsieh 2022 reproduction.",
@@ -178,5 +176,329 @@
       }
     },
     "next_hosted_revision": "pending; previous successful jobs do not establish corrected-core/browser/stripe acceptance"
-  }
+  },
+  "updated_utc": "2026-10-13T19:23:13.917761+00:00",
+  "hosted_CI_third_commit": {
+    "snapshot_utc": "2026-10-13T19:22:00.828943+00:00",
+    "commit": "94f3e225af054fe5779ea3bc910ef56bb08c3670",
+    "checks": [
+      {
+        "name": "linux-science",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/MichalGd/microc2compare/actions/runs/38452396261/job/115486354891",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4.2.2",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run conda-incubator/setup-miniconda@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Create CI-owned scientific environments",
+            "conclusion": "success"
+          },
+          {
+            "name": "Shell and numerical tests",
+            "conclusion": "failure"
+          },
+          {
+            "name": "Full descriptive fixture, read-only identities and resume",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Selected modules, TAD variant and full/selected agreement",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Run conda-incubator/setup-miniconda@v4",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Run actions/checkout@v4.2.2",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "started_at": "2026-10-13T19:08:04Z",
+        "completed_at": "2026-10-13T19:14:12Z",
+        "test_summaries": [
+          "2026-10-13T19:14:07.2030934Z 1 failed, 375 passed, 11 skipped, 42 warnings in 252.75s (0:04:12)"
+        ],
+        "success_markers": []
+      },
+      {
+        "name": "r-adapters",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/MichalGd/microc2compare/actions/runs/38452396261/job/115486354746",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4.2.2",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run conda-incubator/setup-miniconda@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Create owned R/core prefixes",
+            "conclusion": "success"
+          },
+          {
+            "name": "Actual R effect and offset checks",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run conda-incubator/setup-miniconda@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4.2.2",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "started_at": "2026-10-13T19:08:04Z",
+        "completed_at": "2026-10-13T19:09:52Z",
+        "test_summaries": [
+          "2026-10-13T19:09:48.2980048Z 2 passed in 19.60s"
+        ],
+        "success_markers": []
+      },
+      {
+        "name": "fine-loops",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/MichalGd/microc2compare/actions/runs/38452396261/job/115486354675",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4.2.2",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run conda-incubator/setup-miniconda@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Create CI-owned core and optional caller prefixes",
+            "conclusion": "success"
+          },
+          {
+            "name": "Required actual caller APIs and new CPU loop/pairs paths",
+            "conclusion": "success"
+          },
+          {
+            "name": "Actual caller imports, multi-resolution workflow and immutable inputs",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run conda-incubator/setup-miniconda@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4.2.2",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "started_at": "2026-10-13T19:08:04Z",
+        "completed_at": "2026-10-13T19:17:21Z",
+        "test_summaries": [
+          "2026-10-13T19:10:18.1349317Z 27 passed, 30 warnings in 20.18s"
+        ],
+        "success_markers": [
+          "2026-10-13T19:17:15.3117316Z Fine-loop acceptance passed. Report: /home/runner/work/_temp/fine-demo/results/demo/synthetic_demo/run001/08_reports/index.html"
+        ]
+      },
+      {
+        "name": "pinned-stripepy",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/MichalGd/microc2compare/actions/runs/38452396212/job/115486354664",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4.2.2",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run conda-incubator/setup-miniconda@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Create isolated core and NumPy 2 stripe prefixes",
+            "conclusion": "success"
+          },
+          {
+            "name": "Actual one/two-process caller and metadata/report contracts",
+            "conclusion": "success"
+          },
+          {
+            "name": "Fresh custom assembly, uneven cultures, report/browser and resume",
+            "conclusion": "success"
+          },
+          {
+            "name": "Retain caller, scope and report acceptance evidence",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run conda-incubator/setup-miniconda@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4.2.2",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "started_at": "2026-10-13T19:08:04Z",
+        "completed_at": "2026-10-13T19:11:27Z",
+        "test_summaries": [
+          "2026-10-13T19:10:03.1446676Z 11 passed in 10.50s",
+          "2026-10-13T19:10:05.9715596Z 11 passed, 14 warnings in 1.14s"
+        ],
+        "success_markers": []
+      },
+      {
+        "name": "pinned-local-conversion",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/MichalGd/microc2compare/actions/runs/38452396158/job/115486353987",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4.2.2",
+            "conclusion": "success"
+          },
+          {
+            "name": "Initialize browser runtime directories",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run conda-incubator/setup-miniconda@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Cache version-bound package downloads",
+            "conclusion": "success"
+          },
+          {
+            "name": "Create optional conversion prefix",
+            "conclusion": "success"
+          },
+          {
+            "name": "Actual converter probe and source-coordinate acceptance",
+            "conclusion": "success"
+          },
+          {
+            "name": "Retain conversion and coordinate evidence",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Cache version-bound package downloads",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run conda-incubator/setup-miniconda@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4.2.2",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ],
+        "started_at": "2026-10-13T19:08:04Z",
+        "completed_at": "2026-10-13T19:10:19Z",
+        "test_summaries": [
+          "2026-10-13T19:10:05.6801451Z 33 passed in 31.12s"
+        ],
+        "success_markers": []
+      }
+    ]
+  },
+  "final_source_corrections": {
+    "pairs": "Active filters, membership and new-grid balancing come from retained-pairs declarations. Original provenance is preserved separately. All new registrations validate before the usable registry is committed last. The printed project variant selects the newly created multiplicative weight column.",
+    "chromosight_only": "Fixed scoring selects discovered candidates whenever either discovery method is enabled; descriptive comparisons with explicit Chromosight discovery no longer implicitly require Mustache. Independent formal feature-universe guards remain enforced. Annotation also selects the discovered catalogue for either caller; real promoter/cCRE annotation regressions preserve native IDs and coordinates.",
+    "saddle": "Rank means use validated manifest observation order. The normal-order values, formula, mask, minimum-bin guard and tie rule remain exact; reordering observations cannot change partition membership.",
+    "focused_local_checks": {
+      "pairs_and_chromosight_selection": {
+        "passed": 23,
+        "seconds": 22.43
+      },
+      "CPU_loop_capabilities": {
+        "passed": 13,
+        "seconds": 6.42
+      },
+      "fresh_chromosight_fixedscore_pipeline": {
+        "passed": 1,
+        "seconds": 47.77,
+        "observations": 3,
+        "conditions": [
+          2,
+          1
+        ],
+        "current_completions": true,
+        "input_hashes_unchanged": true,
+        "Mustache_required": false,
+        "after_final_annotation_source": true
+      },
+      "emitted_pairs_weight_variant_and_preflight": {
+        "passed": 1,
+        "seconds": 7.29
+      },
+      "saddle_order_and_fixture": {
+        "passed": 8,
+        "cooltools_skipped_on_Windows": 2,
+        "seconds": 9.87
+      },
+      "actual_annotation_stage": {
+        "passed": 4,
+        "seconds": 3.39,
+        "caller_selections": [
+          "Chromosight_only",
+          "main_only",
+          "both"
+        ]
+      }
+    },
+    "next_hosted_checks": "The final source revision must pass the current branch Linux checks; earlier success applies to its recorded commit only."
+  },
+  "authoritative_current_hosted_status": "GitHub checks on upgrade/general-purpose-0.4.0; these stored results are timestamped chronological evidence, not a live status feed."
 }

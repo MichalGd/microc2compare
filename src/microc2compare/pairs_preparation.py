@@ -14,6 +14,7 @@ from pathlib import Path
 
 import cooler
 import h5py
+import jsonschema
 import numpy as np
 import pandas as pd
 
@@ -102,6 +103,57 @@ def _recipe(record):
     return dict(recipe, rescale_marginals=recipe.get("rescale_marginals", True))
 
 
+def _active_provenance(original, record, membership):
+    """Describe the retained pairs supplying NEW maps, preserving old evidence."""
+    filters = copy.deepcopy(record["upstream_filters"])
+    filters["min_distance_bp"] = filters.pop("minimum_cis_distance_bp")
+    result = {"reference_id": record["reference_id"], "count_units": "unique_contacts",
+              "filters": filters, "balancing": {}, "dedup_scope": record["dedup_scope"],
+              "library_ids": sorted({r["library_id"] for r in membership}),
+              "source_ids": sorted({r["source_id"] for r in membership}),
+              "pairs_provenance": copy.deepcopy(record), "source_provenance": copy.deepcopy(original)}
+    if original.get("synthetic_fixture") is True:
+        result["synthetic_fixture"] = True
+    return result
+
+
+def _validate_prepared_outputs(c, updated, registry, sizes, membership):
+    """Validate every new registration before publishing its usable commit point."""
+    schema = load_structured(Path(__file__).resolve().parents[2]/"schemas/provenance.schema.json")
+    require(set(registry["samples"]) == {s["sample_id"] for s in updated}, "Prepared registry sample mismatch")
+    for sample in updated:
+        sid = sample["sample_id"]
+        provenance = load_structured(sample["provenance_path"])
+        jsonschema.validate(provenance, schema)
+        own = [r for r in membership if r["sample_id"] == sid]
+        require(set(provenance["library_ids"]) == {r["library_id"] for r in own} and
+                set(provenance["source_ids"]) == {r["source_id"] for r in own}, "Prepared provenance membership mismatch")
+        require(provenance["filters"]["min_distance_bp"] ==
+                provenance["pairs_provenance"]["upstream_filters"]["minimum_cis_distance_bp"],
+                "Prepared contact cutoff contradicts retained pairs")
+        for grid, uri in registry["samples"][sid].items():
+            resolution = int(grid)
+            clr = cooler.Cooler(uri)
+            require(clr.binsize == resolution and clr.info.get("genome-assembly") == c["REFERENCE_ID"] and
+                    clr.info.get("storage-mode") == "symmetric-upper", "Prepared registry matrix semantics mismatch")
+            require(int(clr.info["sum"]) == provenance["derived_resolutions"][grid]["counts"]["retained"],
+                    "Prepared registry count conservation mismatch")
+            expected = cooler.binnify(sizes, resolution)
+            native = clr.bins()[:]
+            require(len(native) == len(expected) and all(np.array_equal(native[k].to_numpy().astype(str) if k == "chrom" else native[k].to_numpy(),
+                    expected[k].to_numpy().astype(str) if k == "chrom" else expected[k].to_numpy()) for k in ("chrom", "start", "end")),
+                    "Prepared registry bin coordinates mismatch")
+            with clr.open("r") as handle:
+                require(np.issubdtype(handle["pixels/count"].dtype, np.integer), "Prepared counts must be integers")
+                require("bins/weight" in handle and bool(np.asarray(handle["bins/weight"].attrs.get("converged", False)).all()),
+                        "Prepared registry weights lack convergence")
+            weights = native["weight"].to_numpy(dtype=float)
+            require(np.isfinite(weights).any() and not np.isinf(weights).any() and
+                    not (weights[np.isfinite(weights)] <= 0).any(), "Prepared registry weights are invalid")
+            require(provenance["balancing"][grid]["converged"] is True and
+                    provenance["balancing"][grid]["convention"] == "multiplicative", "Prepared weight provenance mismatch")
+
+
 def prepare_from_pairs(c, out, resolutions=None):
     """Return a registry/result dict after every requested NEW map converges.
 
@@ -147,6 +199,10 @@ def prepare_from_pairs(c, out, resolutions=None):
                 and isinstance(filters.get("retained_pair_types"), list) and filters["retained_pair_types"]
                 and all(isinstance(t, str) and re.fullmatch(r"[A-Z]{2}", t) for t in filters["retained_pair_types"]),
                 "Declare upstream_filters minimum_cis_distance_bp and retained_pair_types; no filters are guessed")
+        require(isinstance(filters.get("mapq"), int) and not isinstance(filters["mapq"], bool) and filters["mapq"] >= 0
+                and isinstance(filters.get("chromosome_policy"), str) and filters["chromosome_policy"].strip(),
+                "Declare retained-pairs upstream_filters mapq and chromosome_policy; old matrix filters are not reused")
+        require("min_distance_bp" not in filters, "Use minimum_cis_distance_bp for the retained-pairs cutoff; conflicting aliases are not accepted")
         require(all(r["dedup_scope"] != "unknown" for r in metadata["membership"] if r["sample_id"] == sample["sample_id"]),
                 "Unknown technical-library deduplication scope blocks pairs preparation")
         recipe = _recipe(record)
@@ -178,7 +234,8 @@ def prepare_from_pairs(c, out, resolutions=None):
         for sample, original, record, recipe, columns in prepared:
             sid = sample["sample_id"]
             registry["samples"][sid] = {}
-            provenance = copy.deepcopy(original)
+            own = [r for r in metadata["membership"] if r["sample_id"] == sid]
+            provenance = _active_provenance(original, record, own)
             previous_stats = None
             for grid in grids:
                 bins = cooler.binnify(sizes, grid)
@@ -220,14 +277,17 @@ def prepare_from_pairs(c, out, resolutions=None):
             updated.append(dict(sample, matrix_path=registry["samples"][sid][str(grids[0])], provenance_path=str(provpath)))
             outputs.append(str(provpath))
         require(all(file_hash(path) == before for path, before in inputs.items()), "An upstream input changed during pairs preparation")
+        _validate_prepared_outputs(c, updated, registry, sizes, metadata["membership"])
         registry_path = root/"matrix_registry.json"
-        atomic_json(registry_path, registry)
         fields = list(dict.fromkeys(k for sample in updated for k in sample))
         write_table(root/"samples.tsv", updated, fields)
         atomic_json(root/"preparation.json", {"status": "prepared_not_scientifically_admitted", "reference_id": c["REFERENCE_ID"],
                     "resolutions": grids, "sample_count": len(samples), "rows": summaries, "inputs": inputs,
                     "inputs_modified": False, "deduplication": "upstream_declared_not_recomputed",
                     "next_action": "Run preflight and project-specific coverage/contact-retention/reproducibility review before fine-grid analysis."})
+        # The usable registry is the last commit point, after every map,
+        # provenance record and companion manifest has validated and published.
+        atomic_json(registry_path, registry)
         outputs.extend(map(str, (registry_path, root/"samples.tsv", root/"preparation.json")))
         return {"matrix_registry": str(registry_path), "samplesheet": str(root/"samples.tsv"),
                 "resolutions": grids, "sample_count": len(samples), "outputs": outputs,

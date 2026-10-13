@@ -99,6 +99,8 @@ the actual upstream evidence):
     "dedup_scope": "consolidated_biological_unit",
     "coordinate_system": "1-based",
     "upstream_filters": {
+      "mapq": 30,
+      "chromosome_policy": "all_registered_chromosomes",
       "retained_pair_types": ["UU"],
       "minimum_cis_distance_bp": 1000
     },
@@ -119,6 +121,11 @@ the actual upstream evidence):
 The illustrated balancing recipe is an explicit declaration, not an assurance
 that these thresholds suit a particular project. `dedup_scope` can also be
 `joint_library`. Deduplication is declared upstream and is not recomputed here.
+The pairs declarations must include their actual mapping-quality threshold and
+chromosome policy. Those declarations, the retained-pairs distance cutoff and
+the validated technical membership supply the NEW maps' active scientific
+provenance. An older matrix's filter cutoff and balancing recipes are preserved
+under `source_provenance`; they never replace the NEW maps' cutoff or recipes.
 The pairs file needs a unique `#columns:` header containing `chrom1`, `pos1`,
 `chrom2`, `pos2` and `pair_type`. A `#genome_assembly:` value, when present, must
 match the registered reference. Plain text and gzip/BGZF text are supported.
@@ -136,8 +143,11 @@ Each requested grid is counted directly from the same retained coordinates,
 with streaming aggregation and Cooler's external merge. This scans the source
 once per requested grid and may use substantial temporary disk space. Every raw
 integer map must conserve the retained contact count, and its new balancing must
-converge under the supplied recipe. Masked weights, including partial terminal
-bins, remain missing. No source map or weight is copied or modified. A failure
+converge under the supplied recipe. Missing weights produced by that recipe
+remain missing. No source map or weight is copied or modified. Before the usable
+registry is published, every entry is checked for exact registered bins,
+integer-count conservation, valid converged weights, full scientific provenance
+and technical membership. A failure
 leaves a diagnostic and unfinished NEW maps for inspection without publishing a
 usable registry.
 
@@ -147,4 +157,4 @@ and the project-specific fine-grid retention/coverage/reproducibility review.
 Preparation publishes `scientific_admission: not_performed` and never approves
 the resolution eligibility registry.
 
-The current Windows development runtime lacks Mustache's optional `hicstraw` import. Its mandatory dual-caller probe fails explicitly; a complete native Mustache runtime is not locally validated for this candidate. The Linux fine-caller CI installs the dedicated recipe, requires both API probes to pass, and runs the CPU/pairs/fresh Chromosight tests before the full fine fixture.
+The Windows development runtime lacks Mustache's optional `hicstraw` import and rejects a mandatory dual-caller probe explicitly. Hosted Linux acceptance at commit `8605a236ab17` passed both actual API probes, CPU/pairs tests and full/selected fine workflows. Later generic source corrections have additional focused checks; the current branch CI repeats the required APIs and complete fine acceptance. These compatibility fixtures do not calibrate biological loop sensitivity.

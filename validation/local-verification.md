@@ -2,7 +2,7 @@
 
 ## General-purpose 0.4.0 candidate, 13 October 2026
 
-Public-checkout checks cover 372 passing cases across the full suite and its corrected-fixture rerun; 10 checks were skipped. The full run recorded 371 passes, 10 skips and one synthetic peak-localization fixture failure; the corrected fixture plus CPU caller/pairs tests passed 27 checks. These overlapping counts are not summed. Product sources were unchanged during the correction.
+Initial Windows public-checkout checks cover 372 passing cases across the full suite and its corrected-fixture rerun; 10 checks were skipped. The full run recorded 371 passes, 10 skips and one synthetic peak-localization fixture failure; the corrected fixture plus CPU caller/pairs tests passed 27 checks. These overlapping counts are not summed. Product sources were unchanged during the correction.
 
 The frozen product implementation runs on fresh unrelated projects, arbitrary assembly identifiers and unequal condition sizes. Actual Chromosight discovery completed central scientific stages and reporting with unchanged synthetic inputs. Isolated StripePy 1.3.0 calls with two processes completed three masked observations, browser export and reporting across separate NumPy runtimes; all eight completion tasks validate and temporary maps are removed. Aggregate checkpoints, serial/parallel agreement, count conservation, exact ADA scores and fresh-audit drift checks pass.
 
@@ -12,6 +12,10 @@ See [the public numerical evidence](general-purpose-040-local.json) and [the upg
 
 
 Hosted fine-loop acceptance passed at commit `8605a236ab17`, including required actual Mustache/Chromosight APIs, CPU/pairs tests, full and selected fine workflows and immutable inputs. R effect/offset checks also passed. The core job exposed two fixture-scope/resource errors and a missing HiCRep dependency chain in its CI-owned test prefix; these are corrected without weakening scientific guards. The browser recipe now uses available SciPy 1.17.1. A fresh Linux stripe workflow exposed an AF_UNIX socket path limit under deep temporary directories; the caller now receives a short private temporary directory with cleanup. Actual Windows StripePy checks pass (7 passed; 4 POSIX-only checks skipped); the 18 saddle/workflow corrective checks pass. Complete core/browser/stripe Linux acceptance remains pending on the next revision. Exact chronological records are in `general-purpose-040-local.json`.
+
+### Final general-purpose integration corrections
+
+Hosted StripePy acceptance at `94f3e225af05` passed all 11 actual caller/POSIX socket tests, 11 metadata/report checks and a fresh uneven-culture workflow through browser/report/resume. Real browser conversion passed 33 checks with decoded vectors, source fields and exact chromosome offsets. R numerical checks passed. The core suite reached 375 passes/11 skips but found observation-order-sensitive saddle partition ranks; validated manifest ordering fixes that while preserving original normal-order values exactly. Final focused checks passed 23 pairs/selection cases, 13 CPU caller cases, one actual three-observation Chromosight discovery/count/fixed-score/report pipeline against the final source (47.77 seconds), four actual catalogue annotation checks, one emitted pairs-weight variant/preflight and eight saddle/fixture cases (two actual cooltools checks skipped locally). Newly prepared maps now use their own filter and weight provenance, and explicit Chromosight-only comparisons/scoring retain their discovered universe. The final Linux revision is tracked by the current GitHub branch checks; stored earlier results remain chronological, source-specific evidence.
 
 ## Project convenience â€” 0.3.2, 10 October 2026
 

@@ -1,6 +1,7 @@
 """Exercise convenience commands through an installed, profile-bound launcher."""
 import csv
 import json
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -14,6 +15,29 @@ from test_handoff import upstream, matrix, write_sheet
 def command(installation, *args):
     return subprocess.run([str(BASH), shell_path(installation[3]), *map(str, args)],
                           env=installation[5], capture_output=True, text=True, timeout=120)
+
+
+def test_pairs_action_selects_new_weights_in_usable_variant(installation, tmp_path, config):
+    from microc2compare.analyses import configure_selection
+    from microc2compare.science import inspect_inputs
+    from test_pairs_preparation_cpu import setup_pairs
+    setup_pairs(tmp_path, config)
+    configure_selection(config, 'qc')
+    config.update(PS_RESOLUTION=2000, MAX_MEMORY_MB=4000,
+                  WEIGHT_COLUMN='old_divisor', WEIGHT_CONVENTION='divisive')
+    conf = tmp_path / 'project.conf'
+    conf.write_text(''.join(f'{key}={shlex.quote(str(value).lower() if isinstance(value, bool) else str(value))}\n'
+                           for key, value in config.items() if not key.startswith('_')), encoding='utf-8')
+    original = file_hash(conf)
+    destination = tmp_path / 'prepared-pairs'
+    assert module('project_tools').run_action('prepare-from-pairs', config, conf, destination) == 0
+    prepared, = tmp_path.glob('project.pairs-grids-*.conf')
+    effective = load(installation, prepared)
+    assert effective.returncode == 0, effective.stderr
+    current = json.loads(effective.stdout)
+    assert current['WEIGHT_COLUMN'] == 'weight' and current['WEIGHT_CONVENTION'] == 'multiplicative'
+    assert inspect_inputs(current)['status'] == 'validated'
+    assert file_hash(conf) == original
 
 
 def test_init_installed_preset_and_override_without_software_settings(installation, tmp_path):

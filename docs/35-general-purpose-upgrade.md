@@ -132,6 +132,11 @@ claim significant specificity. ADA conditions retain matching stable domain IDs.
 Compartment means use selected phased scores only; raw E1/E2/E3 components are
 exported per observation without condition averaging. Their saved scaling is
 preserved, so mean amplitude is not a quantitative compartment-strength estimate.
+Stripe condition tracks retain each observation's native calls per grid and
+annotate direct same-condition support from distinct observations. Multiple
+matched calls from one observation count once; cross-condition or transitive-only
+links do not contribute. Missing support is unverified. No stripe coordinates
+are merged or strengths averaged.
 The README, track inventory, source identities and checksums describe loading.
 UCSC files contain the appropriate custom-track headers.
 

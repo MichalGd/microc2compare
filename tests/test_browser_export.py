@@ -217,6 +217,156 @@ def test_optional_stripe_seed_overlap_preserved(tmp_path):
     assert len(list((out / "source_tables/stripes/support").glob("*"))) == 3
 
 
+def add_condition_stripes(run, samples, with_support=True):
+    calls = {}
+    for sid, values in {
+        "Alpha1": [("shared_id", 10, 20, 80, "12.3400")],
+        "Alpha2": [],
+        "Beta1": [("shared_id", 10, 20, 80, "23.4500")],
+        "Beta2": [("stripe_b1", 10, 30, 90, "34.5600"), ("stripe_b2", 10, 40, 100, "45.6700")],
+        "Beta3": [("stripe_c", 20, 30, 100, "56.7800")],
+    }.items():
+        condition = next(s["condition"] for s in samples if s["sample_id"] == sid)
+        rows = [dict(stripe_id=fid, sample_id=sid, condition=condition, reference_id="hg38", resolution=10,
+                     chrom1="chr1", start1=start, end1=end, chrom2="chr1", start2=start, end2=body_end,
+                     direction="downstream", matrix_location="LT", seed_bp=start, relative_change=change,
+                     original_descriptor="retained without averaging") for fid, start, end, body_end, change in values]
+        fields = tuple(rows[0]) if rows else ("stripe_id", "sample_id", "condition", "reference_id", "resolution",
+                  "chrom1", "start1", "end1", "chrom2", "start2", "end2", "direction", "matrix_location", "seed_bp", "relative_change", "original_descriptor")
+        write_table(run / f"03_features/stripes/{sid}.10.tsv", rows, fields)
+        write_table(run / f"03_features/stripes/{sid}.20.tsv", [], fields)
+        calls[sid] = rows
+    if not with_support:
+        return calls
+    summaries = [dict(sample_id=s["sample_id"], condition=s["condition"], reference_id="hg38", resolution=res,
+                      stripe_count=len(calls[s["sample_id"]]) if res == 10 else 0,
+                      biological_replicates_in_condition=sum(x["condition"] == s["condition"] for x in samples))
+                 for res in (10, 20) for s in samples]
+    write_table(run / "03_features/stripes/summary.tsv", summaries, tuple(summaries[0]))
+    matches = [dict(resolution=10, sample1=a, stripe1=fa, sample2=b, stripe2=fb,
+                    same_condition=(a.startswith("Beta") == b.startswith("Beta")), direction="downstream")
+               for a, fa, b, fb in [
+                   ("Alpha1", "shared_id", "Beta1", "shared_id"),
+                   ("Alpha1", "shared_id", "Beta2", "stripe_b1"),
+                   ("Alpha1", "shared_id", "Beta2", "stripe_b2"),
+                   ("Beta1", "shared_id", "Beta2", "stripe_b1"),
+                   ("Beta1", "shared_id", "Beta2", "stripe_b2"),
+                   ("Beta2", "stripe_b1", "Beta3", "stripe_c"),
+                   ("Beta2", "stripe_b2", "Beta3", "stripe_c"),
+                   # Duplicate and reversed links still count the peer once.
+                   ("Beta1", "shared_id", "Beta2", "stripe_b1"),
+                   ("Beta2", "stripe_b1", "Beta1", "shared_id")]]
+    write_table(run / "03_features/stripes/matches.tsv", matches, tuple(matches[0]))
+    write_json(run / "03_features/stripes/summary.json",
+               {"condition_members": {condition: [s["sample_id"] for s in samples if s["condition"] == condition]
+                                      for condition in ("control", "stimulated")}})
+    return calls
+
+
+def test_condition_stripes_preserve_native_calls_and_direct_distinct_observation_support(tmp_path):
+    run, config, samples = bundle(tmp_path, signals=False)
+    calls = add_condition_stripes(run, samples)
+    before = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in run.rglob("*") if p.is_file()}
+    with patch("microc2compare.browser_export.shutil.which", return_value=None):
+        out, inventory = exported(tmp_path, dict(config, EXPORT_HIGLASS=True))
+    rows = table(out / "stripes/conditions/stimulated/direct_support_10.tsv")
+    by_id = {(row["sample_id"], row["stripe_id"]): row for row in rows}
+    assert len(rows) == 4  # Two calls from Beta2 retain two different geometries.
+    a = by_id[("Beta1", "shared_id")]
+    assert a["n_direct_support_observations"] == "2" and a["n_direct_support_other_observations"] == "1"
+    assert a["n_condition_observations"] == "3" and float(a["direct_support_fraction_all"]) == pytest.approx(2/3)
+    assert a["direct_support_sample_ids"] == "Beta1;Beta2"  # No cross-condition or transitive Beta3 support.
+    assert json.loads(a["direct_matched_call_ids"]) == [["Beta2", "stripe_b1"], ["Beta2", "stripe_b2"]]
+    assert by_id[("Beta2", "stripe_b1")]["n_direct_support_observations"] == "3"
+    assert by_id[("Beta3", "stripe_c")]["n_direct_support_observations"] == "2"
+    control = table(out / "stripes/conditions/control/direct_support_10.tsv")[0]
+    assert control["n_direct_support_observations"] == "1" and control["n_condition_observations"] == "2"
+    assert control["n_condition_observations_with_saved_tables"] == "2"  # Empty Alpha2 table is retained.
+    assert control["browser_id"] != a["browser_id"]  # Original ID shared across observations remains distinct.
+    geometry = next(r for r in inventory if r["analysis"] == "stripes" and r["scope"] == "condition"
+                    and r["label"] == "stimulated" and r["resolution"] == "10" and r["format"] == "bedpe")
+    assert geometry["higlass_status"].startswith("converter_missing") and geometry["higlass_filetype"] == "bed2ddb"
+    exported_geometry = [line.split("\t") for line in (out / geometry["bedpe_path"]).read_text().splitlines()]
+    for native in calls["Beta1"] + calls["Beta2"] + calls["Beta3"]:
+        saved = by_id[(native["sample_id"], native["stripe_id"])]
+        assert all(saved[field] == str(value) for field, value in native.items())
+        expected = [str(native[field]) for field in ("chrom1", "start1", "end1", "chrom2", "start2", "end2")]
+        assert next(row[:6] for row in exported_geometry if row[6] == saved["browser_id"]) == expected
+    assert all(before[p] == hashlib.sha256(p.read_bytes()).hexdigest() for p in before)
+    empty = [r for r in inventory if r["analysis"] == "stripes" and r["scope"] == "condition" and r["resolution"] == "20"]
+    assert len(empty) == 6 and all(r["rows"] == "0" for r in empty)
+    assert table(out / "stripes/conditions/stimulated/direct_support_20.tsv") == []
+    assert json.loads((out / "stripes/conditions/stimulated/direct_support_20.json").read_text())["native_call_count"] == 0
+
+
+def test_condition_stripes_without_support_products_remain_unverified(tmp_path):
+    run, config, samples = bundle(tmp_path, signals=False)
+    add_condition_stripes(run, samples, with_support=False)
+    out, inventory = exported(tmp_path, config)
+    rows = table(out / "stripes/conditions/stimulated/direct_support_10.tsv")
+    assert rows and all(r["direct_pairwise_support_status"] == "unverified_support_unavailable" for r in rows)
+    assert all(r["n_direct_support_observations"] == r["direct_support_fraction_all"] == "NA" for r in rows)
+    assert all(r["n_condition_observations"] == "3" for r in rows)
+    assert any(r["analysis"] == "stripes" and r["scope"] == "condition" and r["format"] == "bedpe" for r in inventory)
+    assert any(r["feature"] == "Stripe condition direct support" for r in table(out / "missing_features.tsv"))
+
+
+def test_condition_stripes_validated_empty_matches_keep_source_only_support(tmp_path):
+    run, config, samples = bundle(tmp_path, signals=False)
+    add_condition_stripes(run, samples)
+    # Distinct observations have disjoint anchors, so no pairwise match is valid.
+    for index, sample in enumerate(samples):
+        path = run / f"03_features/stripes/{sample['sample_id']}.10.tsv"
+        rows = table(path)
+        for row in rows:
+            for field in ("start1", "end1", "start2", "end2", "seed_bp"):
+                row[field] = str(int(row[field]) + index * 1000)
+        with path.open(encoding="utf-8") as stream:
+            fields = next(csv.reader(stream, delimiter="\t"))
+        write_table(path, rows, fields)
+    path = run / "03_features/stripes/matches.tsv"
+    with path.open(encoding="utf-8") as stream:
+        fields = next(csv.reader(stream, delimiter="\t"))
+    write_table(path, [], fields)
+    out, _ = exported(tmp_path, config)
+    for condition, denominator in (("control", "2"), ("stimulated", "3")):
+        rows = table(out / f"stripes/conditions/{condition}/direct_support_10.tsv")
+        assert rows and all(r["n_direct_support_observations"] == "1" for r in rows)
+        assert all(r["n_direct_support_other_observations"] == "0" for r in rows)
+        assert all(r["n_condition_observations"] == denominator for r in rows)
+        assert all(r["direct_pairwise_support_status"] == "saved_direct_pairwise_links" for r in rows)
+        assert all(json.loads(r["direct_matched_call_ids"]) == [] for r in rows)
+
+
+@pytest.mark.parametrize("corruption", ["direction", "same_condition", "self", "anchor_overlap", "chromosome"])
+def test_condition_stripes_reject_inconsistent_direct_support_links(tmp_path, corruption):
+    run, config, samples = bundle(tmp_path, signals=False)
+    add_condition_stripes(run, samples)
+    path = run / "03_features/stripes/matches.tsv"
+    matches = table(path)
+    if corruption == "direction":
+        matches[0]["direction"] = "upstream"
+    elif corruption == "same_condition":
+        matches[0]["same_condition"] = "True"
+    elif corruption == "self":
+        matches[0].update(sample2=matches[0]["sample1"], stripe2=matches[0]["stripe1"])
+    else:
+        matches[0].update(sample2="Beta3", stripe2="stripe_c")
+        if corruption == "chromosome":
+            call_path = run / "03_features/stripes/Beta3.10.tsv"
+            calls = table(call_path)
+            calls[0].update(chrom1="chr2", chrom2="chr2")
+            write_table(call_path, calls, tuple(calls[0]))
+            for resolution in (10, 100):
+                grid_path = run / f"00_metadata/masks/{resolution}.bins.tsv"
+                grid = table(grid_path) + [{"chrom": "chr2", "start": "20", "end": "30"}]
+                write_table(grid_path, grid, ("chrom", "start", "end"))
+    write_table(path, matches, tuple(matches[0]))
+    with pytest.raises(ValueError, match="Stripe support link"):
+        exported(tmp_path, config)
+    assert not (tmp_path / "browser-output/export_audit.json").exists()
+
+
 def test_bigwig_decoded_roundtrip_checks_float32_values_and_coordinates(tmp_path):
     raw = tmp_path / "signal.bedGraph"
     raw.write_text("chr1\t0\t10\t0.1\nchr1\t10\t20\t0.1\nchr1\t20\t30\t0\n")

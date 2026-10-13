@@ -99,10 +99,93 @@ def _profiles(ctx, full_sizes):
     return profiles, analysis_profile
 
 
+def _stripe_condition_tracks(ctx, native, matches, support_sources):
+    """Display original calls with direct observation support, never a consensus."""
+    if not native:
+        return
+    calls = {(sid, resolution, row["stripe_id"]): row
+             for (sid, resolution), rows in native.items() for row in rows}
+    peers = {key: set() for key in calls}
+    sample_conditions = {s["sample_id"]: s["condition"] for s in ctx.samples}
+    for row in matches or []:
+        resolution = int(row["resolution"])
+        left = (row["sample1"], resolution, row["stripe1"])
+        right = (row["sample2"], resolution, row["stripe2"])
+        if sample_conditions[left[0]] == sample_conditions[right[0]]:
+            peers[left].add(right)
+            peers[right].add(left)
+    fields = ("stripe_id", "sample_id", "condition", "reference_id", "resolution",
+              "chrom1", "start1", "end1", "chrom2", "start2", "end2", "direction",
+              "matrix_location", "browser_id", "browser_label",
+              "n_direct_support_observations", "n_direct_support_other_observations",
+              "n_condition_observations", "direct_support_fraction_all",
+              "direct_support_sample_ids", "direct_matched_call_ids",
+              "direct_pairwise_support_status", "n_condition_observations_with_saved_tables",
+              "missing_call_table_sample_ids", "coordinate_rule")
+    for condition, members in ctx.conditions.items():
+        for resolution in sorted({res for _, res in native}):
+            saved = [sid for sid in members if (sid, resolution) in native]
+            missing = [sid for sid in members if sid not in saved]
+            output = Path("stripes") / "conditions" / token(condition)
+            rows, rectangles, anchors, bodies = [], [], [], []
+            source = [str(ctx.run / f"03_features/stripes/{sid}.{resolution}.tsv") for sid in saved]
+            source.extend(str(path) for path in support_sources)
+            status = "saved_direct_pairwise_links" if matches is not None else "unverified_support_unavailable"
+            for sid in saved:
+                for row in native[(sid, resolution)]:
+                    key = (sid, resolution, row["stripe_id"])
+                    supporting = {sid} | {peer[0] for peer in peers[key]}
+                    count = len(supporting) if matches is not None else None
+                    browser_id = sid + ":" + row["stripe_id"]
+                    browser_label = f"{browser_id}:direct_support_{count if count is not None else 'NA'}_of_{len(members)}"
+                    record = dict(row)
+                    for field, value in (("sample_id", sid), ("condition", condition),
+                                         ("reference_id", ctx.assembly), ("resolution", resolution)):
+                        record.setdefault(field, value)
+                    record.update(browser_id=browser_id, browser_label=browser_label,
+                                  n_direct_support_observations=count,
+                                  n_direct_support_other_observations=count - 1 if count is not None else None,
+                                  n_condition_observations=len(members),
+                                  direct_support_fraction_all=count / len(members) if count is not None else None,
+                                  direct_support_sample_ids=";".join(s for s in members if s in supporting) if count is not None else "NA",
+                                  direct_matched_call_ids=[[peer[0], peer[2]] for peer in sorted(peers[key])] if count is not None else None,
+                                  direct_pairwise_support_status=status,
+                                  n_condition_observations_with_saved_tables=len(saved),
+                                  missing_call_table_sample_ids=";".join(missing),
+                                  coordinate_rule="exact_original_native_call_no_merging")
+                    rows.append(record)
+                    a = ctx.coords(tuple(row[f"{field}1"] for field in ("chrom", "start", "end")))
+                    b = ctx.coords(tuple(row[f"{field}2"] for field in ("chrom", "start", "end")))
+                    rectangles.append((*a, *b, browser_id))
+                    color = "0,114,178" if count is not None and count >= 2 else "90,90,90" if count == 1 else "170,170,170"
+                    anchors.append((*a, browser_label + ":anchor", 0, ".", a[1], a[2], color))
+                    bodies.append((*b, browser_label + ":body", 0, ".", b[1], b[2], color))
+            all_fields = list(dict.fromkeys([*fields, *(field for row in rows for field in row)]))
+            ctx.write_table(output / f"direct_support_{resolution}.tsv", rows, all_fields)
+            _json(ctx, output / f"direct_support_{resolution}.json",
+                  {"condition": condition, "resolution": resolution, "condition_members": members,
+                   "n_observations_with_saved_tables": len(saved), "missing_call_table_sample_ids": missing,
+                   "native_call_count": len(rows), "support_status": status,
+                   "support_rule": "Source observation plus distinct same-condition observations linked directly by saved anchor-overlap/same-direction matches; no transitive support",
+                   "coordinate_rule": "Every original call retained without merging", "inference_status": "descriptive"})
+            paired = ctx.destination(output / "higlass" / f"rectangles_{resolution}.bedpe")
+            paired.write_text("".join("\t".join(map(str, row)) + "\n" for row in rectangles), encoding="utf-8")
+            description = f"{condition}: original stripe calls, {resolution} bp; direct support counts source plus distinct linked same-condition observations; denominator {len(members)}; {status}; no merging or significance"
+            ctx.add_track(None, paired, "stripes", "condition", condition, "bedpe", ";".join(source),
+                          description, len(rectangles), resolution, bedpe_path=paired)
+            for part, intervals in (("anchor", anchors), ("body", bodies)):
+                ctx.bed(f"{part}_{resolution}.bed", intervals,
+                        description + "; blue=at least two directly supporting observations, dark gray=source only, light gray=unverified",
+                        "stripes", "condition", condition, ";".join(source), resolution)
+            if missing:
+                ctx.add_missing(f"{condition} stripe calls/{resolution}", "Saved call tables are missing for " + ", ".join(missing) + "; no biological absence is inferred.")
+    ctx.notes.append("Stripe condition tracks retain every native call geometry and its original stripe_id/sample/descriptors in direct_support_<grid>.tsv. Browser IDs combine source sample and stripe ID. Support counts the source plus distinct same-condition observations with a saved direct anchor-overlap/same-direction link at that grid; multiple matched calls from one observation count once. Cross-condition links and transitive-only neighbors do not contribute. Metadata supplies the full condition denominator; missing call tables are explicit. Without saved support products counts remain NA/unverified. No coordinates are merged, strengths averaged, consensus catalogue created or differential significance inferred.")
+
+
 def _stripes(ctx):
     directory = ctx.run / "03_features/stripes"
     files = sorted(directory.glob("*.tsv"))
-    count, stripe_ids, stripe_counts = 0, set(), {}
+    count, stripe_ids, stripe_counts, native = 0, set(), {}, {}
     for sample in ctx.samples:
         sid = sample["sample_id"]
         for path in files:
@@ -113,6 +196,7 @@ def _stripes(ctx):
                 continue
             resolution = int(ending)
             rows = ctx.table(path, ("stripe_id", "chrom1", "start1", "end1", "chrom2", "start2", "end2", "direction", "matrix_location"))
+            native[(sid, resolution)] = rows
             stripe_counts[(sid, resolution)] = len(rows)
             require(len({r["stripe_id"] for r in rows}) == len(rows) and all(r["stripe_id"] for r in rows), "Empty/duplicate stripe IDs")
             rectangles, anchors, bodies = [], [], []
@@ -147,26 +231,45 @@ def _stripes(ctx):
             ctx.copy_source(path, f"stripes/individual/{token(sid)}/{resolution}.tsv")
             count += 1
     support_files = [directory / name for name in ("summary.tsv", "matches.tsv", "summary.json")]
+    matches = None
     if any(path.is_file() for path in support_files):
         require(all(path.is_file() for path in support_files), "Incomplete saved stripe support products")
         samples = {s["sample_id"]: s for s in ctx.samples}
         summaries = ctx.table(support_files[0], ("sample_id", "condition", "reference_id", "resolution", "stripe_count", "biological_replicates_in_condition"))
+        summary_keys = set()
         for row in summaries:
             require(row["sample_id"] in samples, "Unknown sample in stripe support summary")
             sample = samples[row["sample_id"]]
             require(row["condition"] == sample["condition"] and row["reference_id"] == ctx.assembly, "Stripe support sample/reference mismatch")
             require(int(row["biological_replicates_in_condition"]) == len(ctx.conditions[row["condition"]]), "Stripe support denominator differs from frozen cohort")
             require(stripe_counts.get((row["sample_id"], int(row["resolution"]))) == int(row["stripe_count"]), "Stripe summary count differs from saved calls")
+            key = (row["sample_id"], int(row["resolution"]))
+            require(key not in summary_keys, "Duplicate stripe support summary")
+            summary_keys.add(key)
+        require(summary_keys == set(stripe_counts), "Stripe summary does not cover every saved call table")
         matches = ctx.table(support_files[1], ("resolution", "sample1", "sample2", "stripe1", "stripe2", "direction"))
+        by_id = {(sid, res, row["stripe_id"]): row for (sid, res), rows in native.items() for row in rows}
         for row in matches:
             resolution = int(row["resolution"])
             require(all((row[f"sample{i}"], resolution, row[f"stripe{i}"]) in stripe_ids for i in (1, 2)), "Stripe support link references an unknown saved call")
             require(row["direction"] in ("upstream", "downstream"), "Invalid stripe support direction")
+            require(row["sample1"] != row["sample2"], "Stripe support links must join different observations")
+            a, b = (by_id[(row[f"sample{i}"], resolution, row[f"stripe{i}"])] for i in (1, 2))
+            require(a["direction"] == b["direction"] == row["direction"], "Stripe support link direction differs from native calls")
+            require(a["chrom1"] == b["chrom1"] and max(int(a["start1"]), int(b["start1"])) < min(int(a["end1"]), int(b["end1"])),
+                    "Stripe support link lacks strict native anchor overlap")
+            if "same_condition" in row:
+                same = samples[row["sample1"]]["condition"] == samples[row["sample2"]]["condition"]
+                require(row["same_condition"].lower() in ("true", "false") and (row["same_condition"].lower() == "true") == same,
+                        "Stripe support link condition differs from metadata")
         summary = ctx.json(support_files[2])
         require({k: set(v) for k, v in summary.get("condition_members", {}).items()} == {k: set(v) for k, v in ctx.conditions.items()}, "Stripe support cohort differs from frozen metadata")
         for path in support_files:
             ctx.copy_source(path, "stripes/support/" + path.name)
         ctx.notes.append("Stripe support sidecars contain pairwise many-to-many links and observation counts. No merged stripe geometry or differential significance is inferred.")
+    _stripe_condition_tracks(ctx, native, matches, support_files if matches is not None else [])
+    if count and matches is None:
+        ctx.add_missing("Stripe condition direct support", "Saved stripe support products are unavailable; native condition geometry is retained with NA/unverified support.")
     if not count:
         ctx.add_missing("Stripes", "No saved optional stripe calls; no stripe discovery is performed by export")
 

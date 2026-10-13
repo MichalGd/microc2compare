@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.4.0 — general-purpose CPU, browser and stripe candidate, 13 October 2026
+
+- Support new projects with their own assemblies, observation counts, conditions and registered matrix grids. Add generic `hsieh_8grid` and `short_range_4kb` presets, input capability reports and explicit exact-position retained-pairs preparation of genuinely new maps. Fine-grid admission remains project-specific; coarser pixels and weights are never promoted to authentic finer grids.
+- Add independent CPU Chromosight discovery alongside fixed-candidate scoring. Retain caller identity, native coordinates, provenance and cross-resolution correspondence; multiple callers from one observation do not increase biological support. Document the current Mustache six-bin ideal occupancy floor and the limits of targeting 4 kb genomic separation. These are adapted profiles, not an exact historical Hsieh reproduction or a detection guarantee.
+- Add bounded CPU/RAM admission, a rolling sample scheduler, per-grid QC workers, parallel quantification/aggregation, atomic unit checkpoints and validated expected-contact reuse. Vectorize expected-table construction while preserving the existing streaming sums and denominator definitions. Resource estimates require representative runtime measurements; they are not hard RSS limits.
+- Reuse dependency validation and source hashes within one audit, with unchanged signatures and fresh checks on subsequent calls; prevent report validation from repeatedly traversing identical prerequisites.
+- Add optional StripePy 1.3.0 discovery in a separate environment. Temporary raw cis maps respect common usable-bin segments; original matrices remain unchanged. Preserve native stripe anchors/bodies, descriptors, direction, coverage and descriptive cross-observation support without claiming biological significance.
+- Add dated browser bundles for saved individual and condition results, including native loops, all saved insulation windows, boundaries/TADs, exact ADA domains/scalars, saved compartment components and stripes. Retain geometry, missingness, reference profiles and source checksums. Optional UCSC/HiGlass conversion has explicit status; export does not ingest into a server or certify rendering.
+- Add explicit donor/culture metadata for descriptive observations and reject unsupported nested-culture inference. Preserve historical run identities; install the candidate alongside the accepted release and use new scientific run IDs.
+
+Local numerical/regression and synthetic integration checks include unrelated projects, unequal condition sizes, multiple references, input checksum preservation, serial/parallel agreement, checkpoint recovery, Mustache geometry/band access and actual Chromosight APIs and isolated one/two-process StripePy execution. Public-checkout checks cover 372 passing cases across the full suite and its corrected-fixture rerun; 10 checks were skipped. The full run recorded 371 passes, 10 skips and one synthetic peak-localization fixture failure; the corrected fixture plus CPU caller/pairs tests passed 27 checks. These overlapping counts are not summed. Product sources were unchanged during the correction. Linux CI execution, optional converter/runtime acceptance, shared-server resource measurements, real-data short-range/stripe sensitivity, installed-browser rendering and formal biological calibration remain separate pending checks. Earlier release acceptance below does not establish 0.4.0 Linux acceptance. See [the upgrade guide](docs/35-general-purpose-upgrade.md), [CPU loops/pairs](docs/cpu_loop_profiles.md), [browser export](docs/browser_export.md) and [stripe detection](docs/34-stripe-detection.md).
+
+## 0.3.3 — performance candidate, 10 October 2026
+
+- Index TAD domain/coverage/disagreement queries and reuse arrays across thresholds; add bounded spawned sample workers with independent CPU/memory settings and execution metrics.
+- Measure both loop candidate sets in one vectorized pixel scan while preserving integer counts, eligible exposures and exclusions.
+- Restrict loop consensus to active nearby clusters and index boundary-derived domain masks.
+- Avoid unused expected-contact computation for Mustache; reuse expected-distance arrays for Chromosight, APA, ADA and saddle windows.
+- Add frozen 0.3.2 numerical comparisons, synthetic algorithm benchmarks and read-only replay acceptance against a completed structural pilot. Existing releases/matrices/configs remain intact; server acceptance is required before activation.
+
+## 0.3.2 — project convenience, 10 October 2026
+
+- Add shared-command synthetic QC demonstration and literal parameter variants.
+- Add compact project initialization with installed scientific presets and explicit per-project overrides.
+- Route upstream discovery/combination, reference/annotation registration, resolution inventory/preparation and completion validation through the same profile-bound `microc2compare -c project.conf` interface.
+- Derive fixed setup and repeated helper arguments internally. Preserve draft evidence gaps, existing hash checks, biological units, imported map hashes and new-directory/no-overwrite behavior.
+- Reuse registered prepared grids; generate companion configurations automatically. Scientific methods, required saddles and statistical gates remain unchanged.
+- Replace obsolete ordinary-user clean-shell/profile/cache instructions with the shared launcher interface; retain installation/acceptance steps for maintainers.
+
+## 0.3.1 — required saddle plots and final reports, 2026-10-10
+
+Full practical/Hsieh-inspired profiles now require compartments, saddle aggregates and the final HTML report. Explicit `--analysis` selections remain independent. The fine-loop example enables 100-kb compartments and APA/ADA/saddle by default. Preflight validates the fixed phasing input before contact scans; a saddle with no eligible common oriented partition fails clearly. Full reports require current arrays for every biological replicate and condition, embed their PNG plots, link SVG/NPZ outputs, and show per-replicate segregation summaries. Condition plots retain equal biological-replicate weighting.
+
+Extended Linux acceptance includes actual compartment analysis, nonempty saddle arrays, embedded replicate/condition plots, saddle-only execution and full/selected numerical agreement. The small synthetic fixture uses an analytically defined phasing signal and a 10-kb compartment grid to provide at least 50 bins; real-data defaults remain 100 kb. Existing core/HiCRep/R and optional caller dependencies are unchanged. Install this version alongside 0.3.0; target-server acceptance and real-data phasing verification remain pending.
+
+## 0.3.0 — fine-resolution loops and autosome policy, 2026-10-10
+
+Added pinned Mustache 1.3.3 discovery, complete 2/4-kb candidate quantification and adapted Chromosight 1.6.3 fixed-window scores. Cross-resolution matching preserves source calls, exposes ambiguous correspondence and prevents duplicate coarse-pixel tests. Added both-anchor GTF/cCRE annotation, per-grid APA/comparisons/volcanoes, equal-replicate condition aggregates, and APA/ADA/saddle PNG/SVG with numerical coverage and shared plot scales. ADA retains its own grid. Added read-only resolution inventory, explicit preparation of only missing integer coarsenings with new-map balancing, reviewed 1-kb/sub-kb admission and primary-source method metadata.
+
+Autosomes are the default for mouse and human; X/Y are opt-in. Frozen chromosome/view identity prevents scope migration on resume. Launchers handle private permissions and scratch-local caches. Shared core/HiCRep/R are reused; optional caller software has a separate checked prefix. Historical runs require their original versioned command or a new RUN_ID. Scientific signatures/calibration recipes change. Source is a validation candidate; target Linux Mustache acceptance, server deployment, real-data pilot and statistical calibration remain distinct pending steps.
+
+## 0.2.7 — legacy input manifests, 2026-10-09
+
+The input helper now reads older sample/merge manifests without reference columns and the known headerless three-column technical membership format. Missing reference evidence remains explicit; known conflicting references and malformed records still fail. Added opt-in `--individual-matrices` for a sheet with exactly one source per declared biological unit: select each existing individual map while preserving historical pooled grouping/replicate conflicts and missing sample provenance for review. The default merged-input rules, subject/library checks, draft evidence gaps and no-overwrite behavior remain strict. Exported inventories and provenance sidecars retain old records and review notes. Scientific stages, their source fingerprints, software profiles and environments are unchanged from accepted 0.2.6. No real matrices or installed source are modified; target-server helper acceptance and real-data provenance review remain required.
+
+## 0.2.6 — common chromosomes and X/Y, 2026-10-09
+
+Added exact coordinate alignment for imported maps with different native chromosome orders or extra unselected scaffolds. Registered views select chromosomes, including X/Y when requested; absent selected chromosomes, unequal lengths/bin grids and incompatible count/filter/weight recipes still fail. Each native map retains its stored weights and raw counts. Feature tables use the common reference order; cooltools receives native-order views. Added scope/coverage audits and report explanations, explicit QC total/exposure scopes, common-grid optional pool creation and thinning, and missing assembly-metadata review in the input helper. Imported-pool verification still requires identical complete native member grids. Added numerical regressions and synthetic Linux scientific acceptance instructions. Existing environments, inputs, shared releases and active launcher are not modified by archive installation. Source signatures/calibration keys change; server acceptance and statistical calibration remain separate requirements.
+
 ## 0.2.5 — automatic shared software profiles, 2026-10-08
 
 Added profile-bound versioned launchers, pinned profile hashes, automatic software-only loading after project configuration, explicit `--software-profile` overrides and recorded profile provenance. Ordinary users no longer need a fixed manual software `source` line. Project inputs, outputs, scientific parameters and resource budgets retain their own configuration values. Added actual launcher/configuration/QC regressions and user/maintainer upgrade instructions. Existing software environments, profiles, releases and scientific/R algorithms are unchanged; the common-helper change conservatively invalidates stage source fingerprints, so resume may recompute stages. Target-server interface acceptance remains required.

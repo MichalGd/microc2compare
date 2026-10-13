@@ -1,0 +1,9 @@
+{
+  "reference_id": "mm39",
+  "gtf": "/path/to/reused/mm39/annotation.gtf",
+  "gtf_sha256": "",
+  "gtf_release": "REPLACE_WITH_VERIFIED_GENCODE_OR_ENSEMBL_RELEASE",
+  "ccre": "/path/to/reused/mm39/mm39.ccre.bed",
+  "ccre_sha256": "",
+  "ccre_source": "REPLACE_WITH_SOURCE_RELEASE_AND_ANY_LIFTOVER_PROVENANCE"
+}

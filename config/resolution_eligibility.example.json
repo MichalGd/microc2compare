@@ -1,0 +1,14 @@
+{
+  "reference_id": "mm39",
+  "scope_digest": "REPLACE_WITH_AUDIT_SCOPE_DIGEST",
+  "audit_path": "../audit/resolutions/audit.json",
+  "audit_sha256": "REPLACE_WITH_ACTUAL_SHA256",
+  "resolutions": {
+    "1000": {
+      "approved": false,
+      "reviewer": "",
+      "retention_review": "",
+      "reproducibility_review": ""
+    }
+  }
+}

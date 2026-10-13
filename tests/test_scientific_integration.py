@@ -17,13 +17,14 @@ REPO=Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.scientific
-def test_actual_cooltools_masked_read_only_adapters(tmp_path,monkeypatch):
+@pytest.mark.parametrize('mixed_scope',[False,True])
+def test_actual_cooltools_masked_read_only_adapters(tmp_path,monkeypatch,mixed_scope):
     pytest.importorskip('cooltools',reason='Full Linux cooltools runtime remains a separate gate')
     # These stages run in core; HiCRep is intentionally in a separate prefix.
-    spec=importlib.util.spec_from_file_location('generator',REPO/'scripts/generate_demo.py')
+    spec=importlib.util.spec_from_file_location('generator',REPO/'scripts'/('generate_common_chromosome_demo.py' if mixed_scope else 'generate_demo.py'))
     generator=importlib.util.module_from_spec(spec);spec.loader.exec_module(generator)
     root=tmp_path/'data';generator.generate(root,development=True)
-    blacklist=root/'blacklist.bed';blacklist.write_text('chrDemo\t2500000\t2510000\n')
+    blacklist=root/'blacklist.bed';blacklist.write_text('chrX\t100000\t110000\n' if mixed_scope else 'chrDemo\t2500000\t2510000\n')
     reference=read_json(root/'references.json');reference.update(blacklist=str(blacklist),blacklist_sha256=file_hash(blacklist));atomic_json(root/'references.json',reference)
     schema=read_json(REPO/'schemas/config.schema.json')
     values={k:str(v['default']).lower() if isinstance(v['default'],bool) else str(v['default']) for k,v in schema['properties'].items()}
@@ -48,7 +49,7 @@ def test_actual_cooltools_masked_read_only_adapters(tmp_path,monkeypatch):
         phase=pd.read_csv(root/'phasing.bedgraph',sep='\t',header=None).iloc[:,3]
         good=np.isfinite(table.oriented_score)
         assert np.corrcoef(table.loc[good,'oriented_score'],phase[good])[0,1]>.1
-        assert pd.isna(table.loc[25,'oriented_score'])
+        assert pd.isna(table.loc[21 if mixed_scope else 25,'oriented_score'])
         insulation=pd.read_csv(Path(c['run_dir'])/f"03_features/insulation/{s['sample_id']}.tsv",sep='\t')
         assert insulation.log2_insulation_score_100000.notna().sum()>400
     assert before=={s['sample_id']:file_hash(s['matrix_path']) for s in samples}

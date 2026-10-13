@@ -37,7 +37,7 @@ jobs:
           printf 'HICREP_ENV_PREFIX="%s"\n' "$RUNNER_TEMP/m2c-hicrep" >> examples/tiny/generated/project.conf
           # Hosted runners have smaller allocations than the server/demo preset.
           printf 'TOTAL_CPUS="2"\nMAX_MEMORY_MB="3000"\n' >> examples/tiny/generated/project.conf
-          for module in QC POOL BALANCE COMPARTMENTS INSULATION LOOPS HICREP QUANTIFY AGGREGATES DIFFERENTIAL DEPTH_SENSITIVITY REPORT PREFLIGHT; do
+          for module in QC POOL BALANCE COMPARTMENTS INSULATION LOOPS HICREP QUANTIFY AGGREGATES DIFFERENTIAL DEPTH_SENSITIVITY REPORT PREFLIGHT TADS CHROMOSIGHT STRIPES BROWSER_EXPORT; do
             printf 'THREADS_%s="1"\nMEMORY_MB_%s="1000"\n' "$module" "$module" >> examples/tiny/generated/project.conf
           done
           sha256sum examples/tiny/generated/*.mcool > "$RUNNER_TEMP/input-sha256.txt"
@@ -52,10 +52,44 @@ jobs:
         run: |
           printf 'ENVIRONMENT_MODE="reuse"\nCONDA_EXE="%s"\nPYTHON_BOOTSTRAP="%s"\nCORE_ENV_PREFIX="%s"\nHICREP_ENV_PREFIX="%s"\nDIFF_R_ENV_PREFIX=""\n' "$(command -v conda)" "$(command -v python3)" "$RUNNER_TEMP/m2c-core" "$RUNNER_TEMP/m2c-hicrep" > "$RUNNER_TEMP/module-site.conf"
           printf 'TOTAL_CPUS="2"\nMAX_MEMORY_MB="3000"\n' > "$RUNNER_TEMP/module-resources.conf"
-          for module in QC POOL BALANCE COMPARTMENTS INSULATION LOOPS HICREP QUANTIFY AGGREGATES DIFFERENTIAL DEPTH_SENSITIVITY REPORT PREFLIGHT; do
+          for module in QC POOL BALANCE COMPARTMENTS INSULATION LOOPS HICREP QUANTIFY AGGREGATES DIFFERENTIAL DEPTH_SENSITIVITY REPORT PREFLIGHT TADS CHROMOSIGHT STRIPES BROWSER_EXPORT; do
             printf 'THREADS_%s="1"\nMEMORY_MB_%s="1000"\n' "$module" "$module" >> "$RUNNER_TEMP/module-resources.conf"
           done
           bash scripts/validate_module_demo.sh --site "$RUNNER_TEMP/module-site.conf" --out "$RUNNER_TEMP/selected-demo" --resource-config "$RUNNER_TEMP/module-resources.conf"
+  fine-loops:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          auto-activate: true
+          activate-environment: ""
+          channels: conda-forge,bioconda
+          channel-priority: strict
+      - name: Create CI-owned core and optional caller prefixes
+        run: |
+          conda env create -p "$RUNNER_TEMP/m2c-core" -f environment.yml
+          conda env create -p "$RUNNER_TEMP/m2c-fine" -f envs/fine-loops.yml
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-fine" python -m pip install pytest==8.3.5
+          printf 'ENVIRONMENT_MODE="reuse"\nCONDA_EXE="%s"\nPYTHON_BOOTSTRAP="%s"\nCORE_ENV_PREFIX="%s"\nLOOP_ENV_PREFIX="%s"\n' "$(command -v conda)" "$(command -v python3)" "$RUNNER_TEMP/m2c-core" "$RUNNER_TEMP/m2c-fine" > "$RUNNER_TEMP/fine-site.conf"
+          printf 'TOTAL_CPUS="2"\nMAX_MEMORY_MB="3000"\n' > "$RUNNER_TEMP/fine-resources.conf"
+          for module in QC COMPARTMENTS INSULATION LOOPS QUANTIFY AGGREGATES DIFFERENTIAL REPORT PREFLIGHT TADS CHROMOSIGHT STRIPES BROWSER_EXPORT; do
+            printf 'THREADS_%s="1"\nMEMORY_MB_%s="1000"\n' "$module" "$module" >> "$RUNNER_TEMP/fine-resources.conf"
+          done
+      - name: Required actual caller APIs and new CPU loop/pairs paths
+        run: |
+          # Fail before pytest if either required caller or numeric API is missing.
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-fine" python scripts/caller_probe.py --mustache --chromosight
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-fine" python -m pytest -q \
+            tests/test_loop_capabilities_cpu.py tests/test_pairs_preparation_cpu.py tests/test_chromosight_pipeline.py
+      - name: Actual caller imports, multi-resolution workflow and immutable inputs
+        run: |
+          bash scripts/validate_fine_loop_demo.sh --site "$RUNNER_TEMP/fine-site.conf" --out "$RUNNER_TEMP/fine-demo" --resource-config "$RUNNER_TEMP/fine-resources.conf"
   r-adapters:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

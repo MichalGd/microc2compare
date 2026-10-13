@@ -6,7 +6,7 @@ On a shared server, invoke the published release from any working directory with
 
 ## Fixed stages
 
-For a profile-bound shared installation, use `microc2compare -c /path/to/project.conf` directly, including `--analysis`, `--resume` and `--dry-run`. Its software profile loads automatically; [selection and precedence](25-automatic-software-profile.md) explain intentional overrides. Direct source-script examples below retain explicit software configuration behavior.
+For a profile-bound shared installation, use `microc2compare -c /path/to/project.conf` directly, including `--analysis`, `--resume` and `--dry-run`. Its software profile loads automatically; [selection and precedence](25-automatic-software-profile.md) explain intentional overrides. The installed command also supplies preparation and validation tools; see [simple project commands](32-simple-project-commands.md). Low-level stage wrappers remain available for expert use.
 
 The runner follows this barrier-separated order:
 
@@ -19,9 +19,8 @@ preflight → register → qc → pool → compartments → insulation → loops
 Disabled optional stages record `skipped_config`. HiCRep runs as its own checked task at the QC barrier. Consensus/quantification run only when their enabled consumers require them. Core analysis does not depend on pool/depth tasks. Requested unsupported modules fail clearly. Small stage wrappers call `run_stage.sh`; `scientific.py`, `metadata.py` and `state.py` centralize their actual interfaces rather than duplicating parsing in each wrapper.
 
 ```bash
-bash scripts/microc2compare.sh -c /path/to/project.conf --dry-run
-bash scripts/preflight_check.sh -c /path/to/project.conf
-bash scripts/microc2compare.sh -c /path/to/project.conf
+microc2compare -c /path/to/project.conf --dry-run
+microc2compare -c /path/to/project.conf
 ```
 
 Dry-run prints the selected enabled stages, threads, memory, concurrency and prerequisites without launching scientific computation. Preflight checks imported data/designs and environments read-only. Main execution additionally snapshots normalized settings and input identities. Initial SHA256 hashing of large imported matrices is necessary registration I/O; unchanged size/mtime reuses the cached SHA on ordinary resume.
@@ -37,10 +36,10 @@ New pool HDF5 files publish from task-owned pending paths after raw sum/converge
 ## Resume controls
 
 ```bash
-bash scripts/microc2compare.sh -c project.conf --resume
-bash scripts/microc2compare.sh -c project.conf --resume --until-stage loops
-bash scripts/microc2compare.sh -c project.conf --resume --from-stage quantify
-bash scripts/microc2compare.sh -c project.conf --resume --rerun-stage qc
+microc2compare -c project.conf --resume
+microc2compare -c project.conf --resume --until-stage loops
+microc2compare -c project.conf --resume --from-stage quantify
+microc2compare -c project.conf --resume --rerun-stage qc
 ```
 
 `--resume` reuses only current valid products. Preflight reruns to refresh actual environment and reference checks. `--from-stage` requires valid prerequisites rather than manufacturing skipped records. `--rerun-stage` requires `--resume` and invalidates that stage plus its dependent commit points; it preserves inputs and existing products until replacements validate. Changing immutable assets/metadata should normally use a new run ID and clear provenance.
@@ -58,7 +57,7 @@ Task scratch is scoped to project/analysis/run/stage/sample, with `TMPDIR` point
 By default there are no derived map tasks. When explicitly enabled, thinning maps are released per seed after P(s)/HiCRep/fixed-feature summaries; retention keeps only requested resolutions. New pooled maps are released after the report's consumers validate. Completion records mark discarded intermediates while retaining their scientific summaries. A stale pooled consumer regenerates only explicitly requested task-owned new pools. Imported maps and imported pools are never cleanup targets.
 
 ```bash
-python3 scripts/validate_outputs.py --config-json /path/to/run/00_metadata/config.json
+microc2compare -c /path/to/project.conf --validate
 ```
 
-This verifies current enabled completion identities/hashes and HiCRep. For a deliberately partial run, supply `--until-stage NAME`. Use report status and per-comparison validation labels before interpretation; a completed software run does not establish calibrated biology.
+This verifies current enabled completion identities/hashes and HiCRep. For a deliberately truncated stage run, the advanced `validate_outputs.py --config-json ... --until-stage NAME` helper remains available. Use report status and per-comparison validation labels before interpretation; a completed software run does not establish calibrated biology.

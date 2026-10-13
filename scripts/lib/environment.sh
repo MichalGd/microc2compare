@@ -14,8 +14,9 @@ env_run() {
     else "${measure[@]}" "$@"; fi
     return
   fi
-  case "$kind" in core) key=CORE_ENV_PREFIX;; hicrep) key=HICREP_ENV_PREFIX;; diff_r) key=DIFF_R_ENV_PREFIX;; *) die "Unknown environment $kind";; esac
+  case "$kind" in core) key=CORE_ENV_PREFIX;; loops) key=LOOP_ENV_PREFIX;; stripes) key=STRIPE_ENV_PREFIX;; browser) key=BROWSER_ENV_PREFIX;; hicrep) key=HICREP_ENV_PREFIX;; diff_r) key=DIFF_R_ENV_PREFIX;; *) die "Unknown environment $kind";; esac
   prefix=$(config_get "$key")
+  if [[ "$kind" == loops && -z "$prefix" ]]; then prefix=$(config_get CORE_ENV_PREFIX); fi
   [[ -d "$prefix/conda-meta" ]] || die "Missing registered $kind prefix: $prefix; run explicit bootstrap setup"
   "${measure[@]}" "$CONDA_EXE" run --no-capture-output -p "$prefix" "$@"
 }

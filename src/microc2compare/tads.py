@@ -6,13 +6,16 @@ classes describe detectable geometry; they do not provide biological P/FDR.
 from __future__ import annotations
 
 import math
+import multiprocessing
+import time
 from bisect import bisect_left, bisect_right
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from .contracts import atomic_json, digest, require, validate_metadata
+from .contracts import allocation_limits, atomic_json, digest, require, validate_metadata
 from .features import feature_id
 
 DOMAIN_COLUMNS = ["feature_id", "chrom", "start", "end", "region", "window_bp", "length_bp",
@@ -31,14 +34,68 @@ def required_support(n, fraction):
     return max(1, math.ceil(n * fraction))
 
 
-def call_domains(table, mask, c, window, sample_id, threshold=None, return_exclusions=False):
+class InsulationIndex:
+    """View-local sorted arrays reused across thresholds and event queries."""
+
+    def __init__(self, table, mask, c):
+        require(len(table) == len(mask), "TAD score grid and registered mask differ")
+        self.minimum = c["INSULATION_MIN_VALID_PIXEL_FRACTION"]
+        self.views = {}
+        self.windows = {}
+        for key, frame in table.groupby(["chrom", "region"], sort=True):
+            frame = frame.sort_values("start")
+            valid = np.asarray(mask, dtype=bool)[frame.index]
+            self.views[key] = (frame, frame.start.to_numpy(), valid,
+                               np.r_[0, np.cumsum(~valid)])
+
+    def window(self, key, window):
+        cache_key = (key, window)
+        if cache_key not in self.windows:
+            frame = self.views[key][0]
+            score = frame[f"log2_insulation_score_{window}"].to_numpy()
+            good = np.isfinite(score) & (frame[f"valid_pixel_fraction_{window}"].to_numpy() >= self.minimum)
+            self.windows[cache_key] = (score, good, np.r_[0, np.cumsum(good)])
+        return self.windows[cache_key]
+
+    def evaluable(self, key, start, end, window):
+        if key not in self.views:
+            return False
+        _, starts, _, bad_mask = self.views[key]
+        _, good, covered = self.window(key, window)
+        a, b = np.searchsorted(starts, [start, end], side="left")
+        ar, br = np.searchsorted(starts, [start, end], side="right")
+        return bool(br > a and (ar-a)+(br-b) == 2 and
+                    good[a:ar].all() and good[b:br].all() and
+                    bad_mask[br] == bad_mask[a] and
+                    (covered[br]-covered[a])/(br-a) >= self.minimum)
+
+
+class IntervalIndex:
+    """Existence of half-open overlaps, including nested rejected intervals."""
+
+    def __init__(self, frames):
+        self.views = {}
+        frame = pd.concat(frames, ignore_index=True)
+        for key, group in frame.groupby(["chrom", "region"], sort=False):
+            group = group.sort_values("start")
+            self.views[key] = (group.start.to_numpy(), np.maximum.accumulate(group.end.to_numpy()))
+
+    def overlaps(self, key, start, end):
+        if key not in self.views:
+            return False
+        starts, ends = self.views[key]
+        last = int(np.searchsorted(starts, end, side="left"))
+        return bool(last and ends[last-1] > start)
+
+
+def call_domains(table, mask, c, window, sample_id, threshold=None, return_exclusions=False, *, index=None):
     """Call adjacent strong boundaries without crossing a excluded grid bin."""
     threshold = c["INSULATION_BOUNDARY_THRESHOLD"] if threshold is None else threshold
     score, strength = f"log2_insulation_score_{window}", f"boundary_strength_{window}"
-    require(len(table) == len(mask), "TAD score grid and registered mask differ")
+    index = index or InsulationIndex(table, mask, c)
     rows, exclusions = [], []
-    for (chrom, region), frame in table.groupby(["chrom", "region"], sort=True):
-        frame = frame.sort_values("start")
+    for (chrom, region), (frame, starts, valid, bad_mask) in index.views.items():
+        scores, good, covered = index.window((chrom, region), window)
         if threshold in ("Li", "Otsu"):
             require(threshold == c["INSULATION_BOUNDARY_THRESHOLD"], "Automatic threshold sensitivity needs separate insulation computation")
             called = frame[f"is_boundary_{window}"].fillna(False).astype(bool)
@@ -52,22 +109,21 @@ def call_domains(table, mask, c, window, sample_id, threshold=None, return_exclu
             if not c["TAD_MIN_LENGTH_BP"] <= end - start <= c["TAD_MAX_LENGTH_BP"]:
                 exclude("outside_domain_length_limits")
                 continue
-            inside = frame.loc[(frame.start >= start) & (frame.start < end)]
-            if not len(inside) or not np.asarray(mask)[inside.index].all():
+            a, b = np.searchsorted(starts, [start, end], side="left")
+            ar, br = np.searchsorted(starts, [start, end], side="right")
+            if b == a or bad_mask[b] != bad_mask[a]:
                 exclude("excluded_grid_bins")
                 continue
-            outer=frame.loc[frame.start.isin([start,end])]
-            if len(outer)!=2 or not np.asarray(mask)[outer.index].all() or not np.isfinite(outer[score]).all() or not (outer[f"valid_pixel_fraction_{window}"]>=c["INSULATION_MIN_VALID_PIXEL_FRACTION"]).all():
+            if (ar-a)+(br-b)!=2 or not valid[a:ar].all() or not valid[b:br].all() or not good[a:ar].all() or not good[b:br].all():
                 exclude("ineligible_boundary_bins")
                 continue
-            good = np.isfinite(inside[score]) & (inside[f"valid_pixel_fraction_{window}"] >= c["INSULATION_MIN_VALID_PIXEL_FRACTION"])
-            if good.mean() < c["INSULATION_MIN_VALID_PIXEL_FRACTION"]:
+            if (covered[b]-covered[a])/(b-a) < c["INSULATION_MIN_VALID_PIXEL_FRACTION"]:
                 exclude("insufficient_score_coverage")
                 continue
             rows.append({"feature_id": feature_id("tad", c["REFERENCE_ID"], (chrom, region, start, end, window), c["INSULATION_RESOLUTION"]),
                          "chrom": chrom, "start": start, "end": end, "region": region, "window_bp": window,
                          "length_bp": end-start, "left_boundary_strength": float(left[strength]),
-                         "right_boundary_strength": float(right[strength]), "mean_log2_insulation": float(inside.loc[good, score].mean()),
+                         "right_boundary_strength": float(right[strength]), "mean_log2_insulation": float(scores[a:b][good[a:b]].mean()),
                          "support": 1, "n_samples": 1, "support_fraction": 1.0,
                          "sample_ids": sample_id, "inference_status": "descriptive"})
     domains=pd.DataFrame(rows,columns=DOMAIN_COLUMNS)
@@ -220,12 +276,39 @@ def match_domains(reference, case, c, comparison, window, evaluable=None, ambigu
     return pd.DataFrame(rows, columns=EVENT_COLUMNS)
 
 
+def _sample_calls(task):
+    sid, table, mask, c, windows, thresholds = task
+    index = InsulationIndex(table, mask, c)
+    return { (window, threshold): call_domains(table, mask, c, window, sid, threshold,
+                                             return_exclusions=True, index=index)
+             for window in windows for threshold in thresholds }
+
+
+def worker_count(c, tables):
+    """Admission estimate for resident parent tables and spawned worker copies.
+
+    The estimate limits concurrency; it is not an OS-enforced memory limit.
+    """
+    limits = allocation_limits()
+    sizes = [int(t.memory_usage(index=True, deep=True).sum()) for t in tables.values()]
+    parent = sum(sizes)*4
+    per_worker = max(max(sizes)*4, 64_000_000)
+    memory = min(c.get("MEMORY_MB_TADS", 16000), c["MAX_MEMORY_MB"])*1_000_000
+    if limits["available_memory_bytes"] is not None:
+        memory = min(memory, limits["available_memory_bytes"])
+    require(memory >= parent+per_worker, "TAD tables exceed the memory admission estimate; increase MEMORY_MB_TADS within the project allocation")
+    return max(1, min(c.get("THREADS_TADS", 1), c["TOTAL_CPUS"],
+                      max(1, int(limits["effective_cpus"])), len(tables),
+                      (memory-parent)//per_worker))
+
+
 def run(c, scope):
     from .science import save
     root = Path(c["run_dir"]); directory = root/"03_features/tads"
     samples = validate_metadata(c)["samples"]
     tables = {s["sample_id"]: pd.read_csv(root/f"03_features/insulation/{s['sample_id']}.tsv", sep="\t") for s in samples}
-    archive = np.load(root/f"00_metadata/masks/{c['INSULATION_RESOLUTION']}.npz")
+    with np.load(root/f"00_metadata/masks/{c['INSULATION_RESOLUTION']}.npz") as archive:
+        mask = archive["mask"].copy()
     bins = pd.read_csv(root/f"00_metadata/masks/{c['INSULATION_RESOLUTION']}.bins.tsv", sep="\t")
     for sid, table in tables.items():
         require(table[["chrom", "start", "end"]].equals(bins[["chrom", "start", "end"]]), f"{sid}: TAD score grid differs from registered bins")
@@ -237,6 +320,20 @@ def run(c, scope):
     primary_threshold = c["INSULATION_BOUNDARY_THRESHOLD"]
     if primary_threshold not in ("Li", "Otsu"): primary_threshold = float(primary_threshold)
     thresholds = [primary_threshold] + sorted(set(float(t) for t in c["TAD_SENSITIVITY_THRESHOLDS"].split(",") if t) - ({primary_threshold} if isinstance(primary_threshold, float) else set()))
+    workers = worker_count(c, tables)
+    started = time.perf_counter()
+    print(f"TAD domain calling: {workers} worker(s), {len(tables)} samples, {len(windows)} windows, {len(thresholds)} thresholds", flush=True)
+    tasks = [(sid, table, mask, c, windows, thresholds) for sid, table in tables.items()]
+    if workers == 1:
+        results = list(map(_sample_calls, tasks))
+    else:
+        # Spawn avoids inherited HDF5 handles and nested forked native libraries.
+        with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn")) as pool:
+            results = list(pool.map(_sample_calls, tasks))
+    sample_calls = dict(zip(tables, results))
+    domain_seconds = time.perf_counter()-started
+    indices = {sid: InsulationIndex(table, mask, c) for sid, table in tables.items()}
+    members = {cond: [s["sample_id"] for s in samples if s["condition"] == cond] for cond in conditions}
 
     def bed(frame, path, name_column):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -247,7 +344,7 @@ def run(c, scope):
     for window in windows:
         for threshold in thresholds:
             primary = threshold == primary_threshold
-            calls={sid:call_domains(table,archive["mask"],c,window,sid,threshold,return_exclusions=True) for sid,table in tables.items()}
+            calls={sid:result[(window,threshold)] for sid,result in sample_calls.items()}
             per_sample={sid:result[0] for sid,result in calls.items()}
             supported, rejected = {}, {}
             for cond in conditions:
@@ -262,28 +359,14 @@ def run(c, scope):
                     outputs.extend([save(frame, Path(str(base)+".tsv")), bed(frame, Path(str(base)+".bed"), "feature_id")])
                     outputs.append(save(calls[sid][1],Path(str(base)+".exclusions.tsv")))
             for comparison in comparisons:
+                comparison_conditions = (comparison["reference_condition"], comparison["case_condition"])
+                overlap_index = IntervalIndex([rejected[cond] for cond in comparison_conditions] +
+                                              [calls[sid][1] for cond in comparison_conditions for sid in members[cond]])
                 def evaluable(side, chrom, region, start, end):
-                    cond = comparison[side+"_condition"]; ids = [s["sample_id"] for s in samples if s["condition"] == cond]
-                    good_samples = 0
-                    for sid in ids:
-                        table = tables[sid]
-                        area = table.loc[(table.chrom == chrom) & (table.region == region) & (table.start >= start) & (table.start <= end)]
-                        score = f"log2_insulation_score_{window}"
-                        ok = np.isfinite(area[score]) & (area[f"valid_pixel_fraction_{window}"] >= c["INSULATION_MIN_VALID_PIXEL_FRACTION"])
-                        # Both outer boundary bins must be present and usable.
-                        outer = area.loc[area.start.isin([start, end])]
-                        if len(area) and len(outer) == 2 and np.isfinite(outer[score]).all() and (outer[f"valid_pixel_fraction_{window}"] >= c["INSULATION_MIN_VALID_PIXEL_FRACTION"]).all() and archive["mask"][area.index].all() and ok.mean() >= c["INSULATION_MIN_VALID_PIXEL_FRACTION"]:
-                            good_samples += 1
-                    return good_samples/len(ids)
+                    ids = members[comparison[side+"_condition"]]
+                    return sum(indices[sid].evaluable((chrom, region), start, end, window) for sid in ids)/len(ids)
                 def ambiguous(chrom, region, start, end):
-                    for cond in (comparison["reference_condition"], comparison["case_condition"]):
-                        frame = rejected[cond]
-                        if ((frame.chrom == chrom) & (frame.region == region) & (frame.start < end) & (frame.end > start)).any(): return True
-                        for sample in samples:
-                            if sample["condition"]!=cond:continue
-                            excluded=calls[sample["sample_id"]][1]
-                            if ((excluded.chrom==chrom)&(excluded.region==region)&(excluded.start<end)&(excluded.end>start)).any():return True
-                    return False
+                    return overlap_index.overlaps((chrom, region), start, end)
                 events = match_domains(supported[comparison["reference_condition"]], supported[comparison["case_condition"]], c, comparison, window, evaluable, ambiguous)
                 for event, count in events.event.value_counts().items():
                     sensitivity.append({"comparison_id": comparison["comparison_id"], "window_bp": window, "boundary_threshold": threshold, "primary": primary, "event": event, "count": int(count), "inference_status": "descriptive"})
@@ -302,4 +385,11 @@ def run(c, scope):
                             "inference_status": "descriptive", "event_fdr": "not_available",
                             "coordinate_convention": "zero_based_half_open", "thresholds": thresholds})
     outputs.append(parameters)
+    performance = directory/"performance.json"
+    atomic_json(performance, {"workers": workers, "samples": len(tables),
+                             "windows": len(windows), "thresholds": len(thresholds),
+                             "domain_calling_seconds": domain_seconds,
+                             "total_seconds": time.perf_counter()-started,
+                             "memory_admission": "conservative estimate; not an OS limit"})
+    outputs.append(performance)
     return outputs

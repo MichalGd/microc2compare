@@ -94,3 +94,9 @@ Use [the variant helper and commands](17-analysis-modules.md#reports-variants-an
 The tests cover known interval events, direction, masks, thresholds and disagreement. The scientific integration test additionally exercises actual cooltools insulation and the TAD adapter when that runtime is available. The new candidate needs target-server acceptance and a biological pilot. These classifications have **no event-level biological P values/FDR**. Calibrated fixed-grid differential insulation supplies related evidence but does not transfer bin-level FDR to a domain or event. A formal TAD-event model is a separate future method.
 
 Method context: [cooltools insulation](https://cooltools.readthedocs.io/en/latest/notebooks/insulation_and_boundaries.html) and [TADCompare's primary paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC7076128/). This module uses its own insulation/interval rules; it does not run TADCompare or reproduce its statistical model.
+
+## Execution and performance
+
+Version 0.3.3 reuses view-local indexes across thresholds and coverage/disagreement queries. Independent sample domain calls use up to `THREADS_TADS` processes (default 2); `MEMORY_MB_TADS` defaults to 8000 decimal MB. These defaults are internal, so existing configs need no new fields. Optional larger reservations stay within total/effective CPU and estimated memory bounds. The parent preserves deterministic matching and output ordering.
+
+`03_features/tads/performance.json` records actual workers and timings. See [performance and parallelism](23-performance-and-parallelism.md) for tuning, numerical agreement tests, and acceptance that replays an earlier completed pilot into a new directory without modifying it.

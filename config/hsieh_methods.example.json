@@ -1,0 +1,13 @@
+{
+  "sources": ["https://pmc.ncbi.nlm.nih.gov/articles/PMC9729117/"],
+  "verified_parameters": {
+    "LOOP_MIN_DISTANCE_BP": {"value": 5000, "source": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9729117/", "location": "Figure 4 caption, EP/PP comparison range"},
+    "LOOP_MAX_DISTANCE_BP": {"value": 2000000, "source": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9729117/", "location": "Figure 4 caption, EP/PP comparison range"}
+  },
+  "differences_from_publication": [
+    "Our reference is mm39; publication uses mm10.",
+    "Mustache thresholds are practical defaults, not verified historical settings.",
+    "Chromosight uses an adapted fixed-window scorer.",
+    "No claim of exact 250-bp or sub-kb reproduction."
+  ]
+}

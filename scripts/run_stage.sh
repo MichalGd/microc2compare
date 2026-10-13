@@ -30,6 +30,9 @@ scope_text=$(state scopes --config "$CONFIG_JSON" --stage "$stage")
 mapfile -t scopes <<< "$scope_text"
 run_scope() {
   local scope=$1 kind=core
+  if [[ "$stage" == chromosight || "$stage" == chromosight_discovery || "$stage" == loops && "$(config_get LOOP_CALLER)" == mustache ]]; then kind=loops; fi
+  [[ "$stage" == stripes || "$stage" == stripe_consensus ]] && kind=stripes
+  [[ "$stage" == browser_export && "$(config_get EXPORT_HIGLASS)" == true && -n "$(config_get BROWSER_ENV_PREFIX)" ]] && kind=browser
   [[ "$stage" == report ]] && kind=core
   local task_log="$RUN_DIR/logs/${stage}.${scope}.log"
   mkdir -p -- "$RUN_DIR/logs" "$RUN_DIR/benchmarks"

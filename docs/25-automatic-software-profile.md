@@ -10,7 +10,7 @@ microc2compare -c /home/USERNAME/my_project/project.conf
 microc2compare -c /home/USERNAME/my_project/project.conf --analysis tads
 ```
 
-No manual `source` line or Conda activation is required for these commands. Each project still chooses its input tables, `OUTDIR`, `SCRATCH_ROOT`, analysis parameters and resource budgets. Outputs are written under `OUTDIR/PROJECT/ANALYSIS_SET_ID/RUN_ID`; they do not go into the shared software directory. Users may select any directory they own, including their home. Session cache/temp exports from [the shared setup guide](16-shared-server-installation.md#3-start-as-an-ordinary-server-user) remain useful for controlling temporary storage.
+No manual `source` line or Conda activation is required for these commands. Each project still chooses its input tables, `OUTDIR`, `SCRATCH_ROOT`, analysis parameters and resource budgets. Outputs are written under `OUTDIR/PROJECT/ANALYSIS_SET_ID/RUN_ID`; they do not go into the shared software directory. Users may select any directory they own, including their home. Since 0.3.1 runtime cache/temp paths are derived internally from `SCRATCH_ROOT/.runtime`; session exports are unnecessary for ordinary workflow commands. Since 0.3.2 [preparation and checking](32-simple-project-commands.md) also use the shared command.
 
 ## Which settings win?
 
@@ -18,8 +18,8 @@ The runner reads template defaults, then the trusted project configuration, then
 
 ```text
 ENVIRONMENT_MODE, CONDA_EXE, PYTHON_BOOTSTRAP,
-CORE_ENV_PREFIX, HICREP_ENV_PREFIX, DIFF_R_ENV_PREFIX,
-CORE_LOCK, HICREP_LOCK, DIFF_R_LOCK, R_SCRIPT
+CORE_ENV_PREFIX, HICREP_ENV_PREFIX, DIFF_R_ENV_PREFIX, LOOP_ENV_PREFIX,
+CORE_LOCK, HICREP_LOCK, DIFF_R_LOCK, LOOP_LOCK, R_SCRIPT
 ```
 
 Their profile values override project software settings, including placeholders in a copied template. Profile assignments to input/output paths, resource budgets or analysis switches are not imported. Profiles are trusted Bash; this filtering is not a security sandbox.

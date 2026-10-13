@@ -1,85 +1,31 @@
-# Your first microc2compare analysis
+# First real-data analysis
 
-microc2tracks converts paired sequencing reads into contact maps. microc2compare compares **existing maps from biological replicates** and writes compact tables, figures, reports and browser signals. You do not need to export a second balanced matrix or rerun alignment/balancing for an ordinary comparison.
-
-## Understand your samples first
-
-Suppose you have three control cultures and three treated cultures, all independently established. One control library was sequenced twice. That is six biological observations, not seven. The two sequencing sources belong to one library and require joint deduplication upstream. If the same culture instead yielded two independently prepared libraries, they remain one biological observation but can be deduplicated separately before consolidation.
-
-For an unpaired experiment, give each actual culture a distinct `subject_id`, such as `culture_C1` and `culture_T1`. For matched samples from donor D1 before/after treatment, use the same actual donor ID in both conditions. Numbers like replicate `1` in two conditions do not establish pairing. [Inputs](02-inputs.md) explains the exact tables.
-
-| Available biological observations | Eligible path under this workflow's policy |
-|---|---|
-| One per condition | Exploratory QC/features and descriptive effects; no biological differential P/FDR |
-| Two independent units per condition | Descriptive, or explicitly preliminary if design and matching calibration pass |
-| Two matched donor pairs | Descriptive; paired inference fails the required residual information floor |
-| Three or more independent units per condition, or three matched pairs | Formal may be requested, subject to input/design/feature/calibration checks |
-
-These are scoped eligibility policies, not guarantees of adequate power. Extra batch/covariate terms can make an otherwise eligible design unidentifiable or too small. Technical libraries, pools and downsampling repeats never increase biological sample size.
-
-## Start with the synthetic demonstration
-
-On an installed shared server, first follow [ordinary-user setup](16-shared-server-installation.md#3-start-as-an-ordinary-server-user). The maintainer follows [step-by-step server installation](15-server-installation-start.md) once to select compatible core and HiCRep prefixes. The [environment policy](01-installation.md) explains reuse and locks. Set the actual published release/profile paths below. Run from any working directory; the demo destination belongs to your account, outside the shared checkout:
+Use your ordinary Linux Bash login. After the maintainer installs and accepts the current profile-bound command, no Conda activation, clean-shell setup, manual profile source, software paths or runtime exports are required.
 
 ```bash
-m2c_src="/opt/conda_envs/microc2compare/releases/shared-design-json-fix-20261008/microc2compare-0.1.0"
-m2c_site="/opt/conda_envs/microc2compare/site/shared-design-json-fix-20261008.conf"
-source "$m2c_site"
-export PYTHONDONTWRITEBYTECODE=1
-umask 077
-m2c_demo="$HOME/microc2compare-work/validation/first-demo-20261007"
-"$CONDA_EXE" run --no-capture-output -p "$CORE_ENV_PREFIX" \
-  python "$m2c_src/scripts/generate_demo.py" --out "$m2c_demo" \
-  --core-prefix "$CORE_ENV_PREFIX" --raw-only
-printf '\nsource "%s"\n' "$m2c_site" >> "$m2c_demo/project.conf"
+microc2compare --init "$HOME/my_microc_project/config/project.conf"
 ```
 
-The appended site profile selects the checked shared software without installing anything. The generated file sources the demo resource preset; reduce global budgets **and** enabled task reservations if the host allocation is smaller than four CPUs/16,000 decimal MB. `--raw-only` here disables cooltools features but retains weighted QC, HiCRep and reporting. It is a small first verification run, not a no-weight analysis and not formal inference. Choose a new empty generator destination if it already contains files.
+Edit the created configuration's project/genome, input locations, output/scratch directories and CPU/RAM budget. The fine profile defaults to 2/4-kb loops, 10-kb insulation/TAD/ADA, 100-kb compartments and APA/ADA/saddles in the final report. Use `--preset existing` during initialization for the older 10-kb profile. Existing finalized projects skip initialization and reuse their completed inputs.
+
+Follow [simple project commands](32-simple-project-commands.md) to import upstream results if needed, complete genuine sample/provenance facts, reuse/register references and optional annotations, then audit requested resolutions. The helper inventories drafts; it does not establish biological independence or approve formal inference. [The upstream handoff guide](13-upstream-handoff.md) explains its evidence fields. Register reference hashes automatically rather than typing them; a common usable phasing track is required for full compartment/saddle analysis.
 
 ```bash
-bash "$m2c_src/scripts/bootstrap_environments.sh" -c "$m2c_demo/project.conf" --check-only
-bash "$m2c_src/scripts/preflight_check.sh" -c "$m2c_demo/project.conf"
-bash "$m2c_src/scripts/microc2compare.sh" -c "$m2c_demo/project.conf" --dry-run
-bash "$m2c_src/scripts/microc2compare.sh" -c "$m2c_demo/project.conf"
+microc2compare -c /your/project/config/project.conf --audit-resolutions
+microc2compare -c /your/project/config/project.conf --analysis qc,hicrep --dry-run
+microc2compare -c /your/project/config/project.conf --analysis qc,hicrep
+microc2compare -c /your/project/config/project.conf --validate
 ```
 
-The plan should show QC/HiCRep and reporting enabled, with pool/depth/features/differential modules disabled for this first demonstration. Expected outputs are under:
-
-```text
-$HOME/microc2compare-work/validation/first-demo-20261007/results/demo/synthetic_demo/run001/
-  00_metadata/                  input/config/environment registrations
-  01_qc/contacts/                six sample contact summaries
-  01_qc/ps/                      raw and balanced contact-decay tables
-  01_qc/hicrep/summary.tsv        fifteen biological-sample pairs
-  08_reports/index.html          report with plots and downloads
-  logs/                         native-tool/task diagnostics
-  completion/                   validated completion records
-```
-
-Open `08_reports/index.html`. Check that all six samples appear, enabled modules have completed, and disabled modules are visibly skipped. Inspect a contact-decay plot and the concordance table. Undefined correlations remain missing values rather than zero. This checks file handling and software behavior on known synthetic data; it does not validate the biological method.
-
-Check resume and output integrity:
+If a preparation operation prints a new sibling configuration, use that path. Inspect contact totals/retention, raw and balanced distance-decay curves, usable-bin coverage and biological-replicate concordance before the full run. All results are under `OUTDIR/PROJECT/ANALYSIS_SET_ID/RUN_ID`; open its `08_reports/index.html`. Undefined measurements stay missing, not zero. Choose a new run ID for a separate history, or use reviewed `--resume` behavior to extend a selected run. The [module guide](17-analysis-modules.md) explains separate analyses and prerequisites.
 
 ```bash
-bash "$m2c_src/scripts/microc2compare.sh" -c "$m2c_demo/project.conf" --resume
-"$PYTHON_BOOTSTRAP" "$m2c_src/scripts/validate_outputs.py" \
-  --config-json "$m2c_demo/results/demo/synthetic_demo/run001/00_metadata/config.json"
+microc2compare -c /your/project/config/project.conf --resume
 ```
 
-For the full descriptive feature demonstration, generate into a **different empty directory** without `--raw-only`, configure the checked prefixes, and repeat these steps. Full feature execution still requires the Linux/cooltools validation gates; the local verification record states what has actually run.
+The full fine-loop run includes obligatory saddle plots in its HTML report. It needs an accepted caller environment, valid resolution-specific inputs and the documented scientific gates. Only an explicit `--prepare-resolutions` operation creates missing exact coarsenings and weights for those new maps; analysis never rebalances imported maps. Running through `nohup` can keep long jobs alive after SSH disconnection; see the project guide.
 
-## Move to your upstream outputs
-
-Use [the input helper and worked handoff](13-upstream-handoff.md) to inventory your real microc2tracks sample sheet/results and export draft manifests. Finish biological, library, deduplication, filtering and reference evidence. Start with explicit descriptive comparisons; passing a file scan does not authorize formal inference.
-
-Your ordinary command remains:
-
-```bash
-bash "$m2c_src/scripts/microc2compare.sh" -c /your/project/config/project.conf --dry-run
-bash "$m2c_src/scripts/microc2compare.sh" -c /your/project/config/project.conf
-```
-
-Use absolute server paths while learning. Quoting matters for paths with spaces. The `.conf` is trusted Bash; CSV/TSV rows are data and never shell commands. Results use `OUTDIR/PROJECT/ANALYSIS_SET_ID/RUN_ID`; change the run ID for a new historical run.
+The synthetic demonstrations test software behavior, not biological calibration. The maintainer runs full/selected/resume acceptance from [the current upgrade guide](33-simple-project-upgrade.md) before activating a candidate. That one-time process uses installed paths and private demo destinations, rather than requiring every researcher to repeat installation setup.
 
 ## Read effects before significance
 

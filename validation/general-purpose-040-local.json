@@ -1,0 +1,138 @@
+{
+  "version": "0.4.0",
+  "created_utc": "2026-10-13T18:41:09.538223+00:00",
+  "status": "local_validation_candidate",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python": "3.11.9",
+  "public_checkout_tests": {
+    "full_run": {
+      "passed": 371,
+      "skipped": 10,
+      "failed": 1,
+      "seconds": 1091.14
+    },
+    "failure": {
+      "test": "test_fresh_chromosight_only_central_stages",
+      "cause": "Synthetic template injected its baseline and created a rectangular edge; stage execution and reporting succeeded, peak-localization assertion failed.",
+      "fix": "Use constant positive contact background and inject only the native kernel excess; no product implementation changed."
+    },
+    "final_targeted_rerun": {
+      "passed": 27,
+      "failed": 0,
+      "seconds": 53.34,
+      "files": [
+        "test_loop_capabilities_cpu.py",
+        "test_pairs_preparation_cpu.py",
+        "test_chromosight_pipeline.py"
+      ]
+    },
+    "unique_passed_cases_covered": 372,
+    "counts_note": "Full-suite and corrective rerun overlap; 27 is not added to 371. The product sources stayed fixed. Two test fixtures and the optional-caller CI job were finalized separately.",
+    "unresolved_failures": 0,
+    "skips": "Optional converters, cooltools, R and StripePy in the main Windows runtime, plus Unix-only checks; isolated actual StripePy acceptance is recorded separately."
+  },
+  "fresh_project_acceptance": {
+    "browser": {
+      "observations": 5,
+      "condition_sizes": [
+        2,
+        3
+      ],
+      "native_coordinate_orders": 2,
+      "prior_cohort_required": false,
+      "input_hashes_unchanged": true,
+      "cli_preflight_registration_export_resume": "passed",
+      "converter_execution": "pending_Linux"
+    },
+    "chromosight": {
+      "observations": 3,
+      "condition_sizes": [
+        2,
+        1
+      ],
+      "assembly": "independent_assembly_v7",
+      "preflight_register_qc_discovery_consensus_count_report": "passed",
+      "mustache_not_implicitly_selected": true,
+      "input_hashes_unchanged": true
+    },
+    "stripepy": {
+      "observations": 3,
+      "condition_sizes": [
+        2,
+        1
+      ],
+      "assembly": "newAssembly",
+      "processes_per_call": 2,
+      "eligible_segments_per_observation": 2,
+      "retained_stripes_per_observation": 1,
+      "masked_gap_handled": true,
+      "input_hashes_unchanged": true,
+      "completion_records_current": true,
+      "temporary_coolers_retained": false,
+      "older_bundles_preserved": true,
+      "native_caller_numpy": "2.4.6",
+      "core_numpy": "1.26.4",
+      "acceptance_record_sha256": "c22a221a94055b83d1de3ece7804be54ef3a02b70a0c0fed59aee9e863f38356"
+    }
+  },
+  "optional_caller_isolation": {
+    "missing_callers_simulated": [
+      "chromosight",
+      "mustache"
+    ],
+    "passed": 23,
+    "expected_skips": 4,
+    "chromosight_1_6_3_numeric_probe": "passed",
+    "native_mustache_probe": "failed_missing_Windows_hicstraw; required_Linux_probe_pending"
+  },
+  "numeric_and_recovery": [
+    "serial/parallel counts and pileups agree",
+    "exact ADA scalar reproduction",
+    "aggregate unit corruption recovery",
+    "worker-count-compatible aggregate checkpoint reuse",
+    "expected-cache mask/weight/runtime drift rejection",
+    "next-audit input/output/source/dependency/metadata corruption rejection",
+    "exact retained-pair count conservation and new-map balancing",
+    "native multiresolution/caller membership without inflated biological support"
+  ],
+  "synthetic_benchmarks": {
+    "expected_table_construction": {
+      "distances": 200000,
+      "old_seconds": 0.598,
+      "new_seconds": 0.0437,
+      "old_traced_mb": 141.6,
+      "new_traced_mb": 38.6,
+      "scope": "output/FFT construction; excludes matrix I/O and process RSS"
+    },
+    "dependency_validation": {
+      "old_hash_calls": 5087,
+      "new_hash_calls": 46,
+      "old_seconds_range": [
+        19,
+        21
+      ],
+      "new_seconds_range": [
+        0.21,
+        0.27
+      ],
+      "identical_signature": true,
+      "scope": "synthetic dependency graph; variable concurrent load"
+    }
+  },
+  "publication_scope": "Allowlisted public source/tests/examples/docs/schemas/environment recipes and nonprivate validation records only.",
+  "pending_acceptance": [
+    "Linux core and optional runtime solves/execution",
+    "complete Mustache native runtime",
+    "real bigWig/beddb/bed2ddb converter acceptance",
+    "HiGlass ingestion and installed client rendering",
+    "72CPU/400GB target-server scaling and RSS/I/O measurements",
+    "representative real-data near-4kb loop sensitivity/false positives",
+    "real-data StripePy calibration and biological inference calibration"
+  ],
+  "scientific_limits": [
+    "Adapted CPU methods, not exact Hsieh 2022 reproduction.",
+    "A 4-kb bin does not demonstrate detection at 4-kb separation.",
+    "No source matrix rebalance, cohort rerun or shared alias activation.",
+    "No new statistical significance claimed."
+  ]
+}

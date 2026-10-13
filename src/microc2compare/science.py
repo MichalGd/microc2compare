@@ -18,11 +18,13 @@ from .contracts import (IDENTIFIER, atomic_json, digest, file_hash, fingerprint,
                         load_structured, read_json, read_table, require, resolve,
                         validate_metadata, validate_allocation, write_table)
 from .features import (LOOP_COLUMNS, boundary_consensus, canonical_loops,
-                       consensus_loops, feature_id, quantify)
-from .matrix import (MaskedCooler, bounded_raw, domain, expected_table, matrix_uri,
-                     pixel_chunks, raw_summary, reference, resolution_set, unordered_total, weights)
+                       consensus_loops, feature_id, quantify, quantify_many)
+from .matrix import (MaskedCooler, aligned_pixel_chunks, analysis_bins, bounded_raw, domain, expected_table, matrix_uri,
+                     native_domain, native_indices, pixel_chunks, raw_summary, reference,
+                     resolution_set, scope_record, tool_views, unordered_total, view_labels, weights)
 from .state import inventory, source_digest, scopes as stage_scopes
-from .analyses import aggregate_modules, comparison_modules
+from .analyses import aggregate_modules, comparison_modules, has_loop_discovery, needs_loop_counts
+from .resolutions import loop_resolutions, quantification_resolutions, sample_matrix
 
 
 def save(frame, path):
@@ -79,26 +81,34 @@ def external_features(c, samples):
     require(isinstance(registry, dict), "Feature registry must describe one frozen BEDPE set")
     import jsonschema
     jsonschema.validate(registry, read_json(Path(__file__).parents[2]/"schemas/features.schema.json"))
-    require(registry["reference_id"] == c["REFERENCE_ID"] and registry["resolution"] == c["LOOP_RESOLUTION"], "External feature reference/resolution mismatch")
+    require(registry["reference_id"] == c["REFERENCE_ID"], "External feature reference mismatch")
     path = resolve(registry["path"], Path(c["INDEPENDENT_FEATURES_REGISTRY"]).parent)
     require(file_hash(path) == registry["sha256"], "Frozen external feature checksum mismatch")
     require(not set(registry["discovery_samples"]) & {s["sample_id"] for s in samples}, "External loop discovery reuses analysis samples")
     require(registry["independent_of_analysis_samples"] is True, "Formal loop features must be independently discovered")
     require(registry.get("source") and registry.get("independence_evidence"), "External candidates require inspectable source/independence evidence")
-    return canonical_loops(pd.read_csv(path, sep="\t"), c["REFERENCE_ID"], c["LOOP_RESOLUTION"]), registry
+    features=canonical_loops(pd.read_csv(path, sep="\t"), c["REFERENCE_ID"], registry["resolution"])
+    features['representative_resolution']=registry['resolution']
+    if Path(c["REFERENCE_REGISTRY"]).is_file():
+        selected=reference(c)[0]["effective_scope"]["chromosomes"]
+        included=features.chrom1.isin(selected)&features.chrom2.isin(selected)
+        registry=dict(registry,out_of_scope_feature_count=int((~included).sum()))
+        features=features.loc[included].reset_index(drop=True)
+    return features, registry
 
 
 def environment_record(c, kind):
     if c["ENVIRONMENT_MODE"] == "development":
-        if kind == "core": return inventory()
+        if kind in ("core","loops","stripes","browser"): return inventory()
         if kind == "hicrep": return {"hicrep": inventory()["packages"]["hicrep"]}
         command = [c["R_SCRIPT"], "--vanilla", "-e", 'cat(R.version.string,"\\n"); for(p in c("edgeR","limma","statmod")) cat(p,as.character(packageVersion(p)),"\\n")']
     else:
-        prefix = c[{"core": "CORE_ENV_PREFIX", "hicrep": "HICREP_ENV_PREFIX", "diff_r": "DIFF_R_ENV_PREFIX"}[kind]]
+        prefix = c[{"core": "CORE_ENV_PREFIX", "loops":"LOOP_ENV_PREFIX", "hicrep": "HICREP_ENV_PREFIX", "diff_r": "DIFF_R_ENV_PREFIX", "stripes": "STRIPE_ENV_PREFIX", "browser": "BROWSER_ENV_PREFIX"}[kind]]
+        if kind=="loops" and not prefix: prefix=c["CORE_ENV_PREFIX"]
         require((Path(prefix)/"conda-meta").is_dir(), f"Missing {kind} prefix {prefix}; run explicit bootstrap")
         packages = subprocess.run([c["CONDA_EXE"], "list", "-p", prefix, "--json"], check=True, text=True, capture_output=True)
         if c["ENVIRONMENT_MODE"] == "locked":
-            lock = c[{"core":"CORE_LOCK","hicrep":"HICREP_LOCK","diff_r":"DIFF_R_LOCK"}[kind]]
+            lock = c[{"core":"CORE_LOCK","loops":"LOOP_LOCK","hicrep":"HICREP_LOCK","diff_r":"DIFF_R_LOCK","stripes":"STRIPE_LOCK","browser":"BROWSER_LOCK"}[kind]]
             require(lock and Path(lock+".inventory.json").is_file(), f"Locked {kind} mode needs a tested lock inventory")
             expected = read_json(lock+".inventory.json")
             require(digest(json.loads(packages.stdout)) == expected["package_digest"], f"{kind} package drift from lock inventory")
@@ -118,11 +128,11 @@ def calibration_design_domain(c,comparison,samples):
 
 
 def calibration_key(c, module, comparison, environments, design_domain=None):
-    keys = ("LOOP_RESOLUTION", "LOOP_MIN_DISTANCE_BP", "LOOP_MAX_DISTANCE_BP", "LOOP_MIN_TOTAL_COUNT", "LOOP_MIN_MEAN_COUNT_AT_MIN_EXPOSURE", "LOOP_MIN_FEATURES_FORMAL", "INSULATION_RESOLUTION", "INSULATION_PRIMARY_WINDOW_BP", "INSULATION_MIN_VALID_PIXEL_FRACTION", "FDR_THRESHOLD")
+    keys = ("LOOP_RESOLUTION", "LOOP_MIN_DISTANCE_BP", "LOOP_MAX_DISTANCE_BP", "LOOP_MIN_TOTAL_COUNT", "LOOP_MIN_MEAN_COUNT_AT_MIN_EXPOSURE", "LOOP_MIN_FEATURES_FORMAL", "INSULATION_RESOLUTION", "INSULATION_PRIMARY_WINDOW_BP", "INSULATION_MIN_VALID_PIXEL_FRACTION", "FDR_THRESHOLD", "CHROMOSOME_SCOPE", "SEX_CHROMOSOMES", "ANALYSIS_CHROMOSOMES", "LOOP_COUNT_WINDOW_BINS")
     if design_domain is None:design_domain=calibration_design_domain(c,comparison,validate_metadata(c)["samples"])
     return digest({"source": source_digest("differential"), "environment": environments,"design_domain":design_domain,
                    "module": module, "design": formula_terms(comparison["design"]),
-                   "recipe": {k:c[k] for k in keys}})
+                   "recipe": {k:c[k] for k in keys},"mask_policy":"intersection_of_usable_bins","reference_id":c['REFERENCE_ID']})
 
 
 def check_calibration(c, comparison, environments):
@@ -164,14 +174,19 @@ def inspect_inputs(c, writing=False):
         jsonschema.validate(metadata[key], read_json(root/"schemas"/(schema+".schema.json")))
     ref, sizes, views = reference(c)
     jsonschema.validate(ref, read_json(root/"schemas/reference.schema.json"))
+    if c["RUN_COMPARTMENTS"]:
+        phasing_track(c, analysis_bins(sizes, views, c["COMPARTMENT_RESOLUTION"]))
     for s in metadata["samples"]:
         prov = read_json(s["provenance_path"])
         jsonschema.validate(prov, read_json(root/"schemas/provenance.schema.json"))
         own = [r for r in metadata["membership"] if r["sample_id"] == s["sample_id"]]
         require(set(prov["library_ids"]) == {r["library_id"] for r in own} and set(prov["source_ids"]) == {r["source_id"] for r in own}, f"{s['sample_id']}: upstream membership does not match biological manifest")
-        require(c["LOOP_MIN_DISTANCE_BP"] >= prov["filters"]["min_distance_bp"], "Loop distance starts below upstream contact cutoff")
+        if has_loop_discovery(c) or needs_loop_counts(c) or "apa" in aggregate_modules(c):
+            require(c["LOOP_MIN_DISTANCE_BP"] >= prov["filters"]["min_distance_bp"], "Loop distance starts below upstream contact cutoff")
     for res in resolution_set(c):
         domain(c, metadata["samples"], res)
+    from .fine_validation import validate as validate_fine
+    validate_fine(c,metadata['samples'],ref)
     if c["RUN_POOL"] and c["POOLS_MANIFEST"]:
         manifest=read_table(c["POOLS_MANIFEST"])
         jsonschema.validate(manifest,read_json(root/"schemas/pools.schema.json"))
@@ -185,14 +200,37 @@ def inspect_inputs(c, writing=False):
             for key in ("matrix_path","provenance_path"):
                 path=resolve(pool[key],Path(c["POOLS_MANIFEST"]).parent).split("::")[0]
                 require(Path(path).is_file(),f"Missing imported pool {key}: {path}")
-    feature_set, feature_registry = external_features(c, metadata["samples"]) if "loops" in comparison_modules(c) or "apa" in aggregate_modules(c) or c["RUN_LOOPS"] else (pd.DataFrame(columns=LOOP_COLUMNS), None)
+    feature_set, feature_registry = external_features(c, metadata["samples"]) if "loops" in comparison_modules(c) or "apa" in aggregate_modules(c) or has_loop_discovery(c) else (pd.DataFrame(columns=LOOP_COLUMNS), None)
     environments = {"core": environment_record(c, "core")}
-    needed_tools = c["RUN_COMPARTMENTS"] or c["RUN_INSULATION"] or c["RUN_LOOPS"]
+    needed_tools = c["RUN_COMPARTMENTS"] or c["RUN_INSULATION"] or (c["RUN_LOOPS"] and c["LOOP_CALLER"]=="cooltools_dots")
     if needed_tools:
         import cooltools
         require(hasattr(cooltools, "eigs_cis") and hasattr(cooltools, "insulation") and hasattr(cooltools, "dots"), "Core cooltools API incompatibility")
     if c["RUN_HICREP"]:
         environments["hicrep"] = environment_record(c, "hicrep")
+    if c["RUN_CHROMOSIGHT"] or c.get("RUN_CHROMOSIGHT_DISCOVERY") or c["RUN_LOOPS"] and c["LOOP_CALLER"]=="mustache":
+        environments["loops"]=environment_record(c,"loops")
+        from .tooling import probe_command
+        tested=subprocess.run(probe_command(c),check=True,capture_output=True,text=True)
+        environments["loops"]["adapter_probe"]=json.loads(tested.stdout)
+    if c.get("RUN_BROWSER_EXPORT") and c.get("EXPORT_HIGLASS") and c.get("BROWSER_ENV_PREFIX"):
+        environments["browser"] = environment_record(c, "browser")
+        command = [c["CONDA_EXE"], "run", "--no-capture-output", "-p", c["BROWSER_ENV_PREFIX"], "python"] if c["ENVIRONMENT_MODE"] != "development" else [__import__("sys").executable]
+        code = "import sys,json; sys.path.insert(0," + repr(str(root/"src")) + "); from microc2compare.browser_runtime import probe; print(json.dumps(probe()))"
+        result = subprocess.run(command + ["-c", code], check=True, capture_output=True, text=True)
+        environments["browser"]["probe"] = json.loads(result.stdout)
+    if c.get("RUN_STRIPES"):
+        environments["stripes"] = environment_record(c, "stripes")
+        command = [c["CONDA_EXE"], "run", "--no-capture-output", "-p", c["STRIPE_ENV_PREFIX"], "python"] if c["ENVIRONMENT_MODE"] != "development" else [__import__("sys").executable]
+        result = subprocess.run(command + ["-c", "import json; from microc2compare.stripes import probe; print(json.dumps(probe()))"], capture_output=True, text=True)
+        # The installed CLI probe is performed in its own prefix; source is supplied explicitly.
+        if result.returncode:
+            code = "import sys,json; sys.path.insert(0," + repr(str(root/"src")) + "); from microc2compare.stripes import probe; print(json.dumps(probe()))"
+            result = subprocess.run(command + ["-c", code], check=True, capture_output=True, text=True)
+        environments["stripes"]["probe"] = json.loads(result.stdout)
+    if c["RUN_ANNOTATION"]:
+        from .annotation import resources
+        annotation_resources=resources(c)
     allowed_comparisons = set(c.get("_comparison_modules", ["loops", "insulation"]))
     inferential = c["RUN_DIFFERENTIAL"] and any(x["inference"] != "descriptive" and set(x["modules"].split(";")) & allowed_comparisons for x in metadata["comparisons"])
     if inferential:
@@ -207,7 +245,9 @@ def inspect_inputs(c, writing=False):
             require("insulation" not in modules or c["RUN_INSULATION"], "Insulation comparison requires RUN_INSULATION=true")
             if comparison["inference"] != "descriptive" and "loops" in modules:
                 require(feature_registry is not None and len(feature_set) > 0, "Formal loops require independent frozen features")
-            check_calibration(c, comparison, environments)
+            if "loops" in modules and comparison["inference"]!="descriptive":
+                for res in quantification_resolutions(c):check_calibration(dict(c,LOOP_RESOLUTION=res),comparison,environments)
+            else:check_calibration(c, comparison, environments)
     if writing:
         out = Path(c["run_dir"])/"00_metadata"
         prior = read_json(out/"inputs.json")
@@ -217,6 +257,10 @@ def inspect_inputs(c, writing=False):
         if feature_registry:
             path = resolve(feature_registry["path"], Path(c["INDEPENDENT_FEATURES_REGISTRY"]).parent)
             prior[path] = fingerprint(path, prior.get(path))
+        if c["RUN_ANNOTATION"]:
+            for key in ("gtf","ccre"):
+                if annotation_resources.get(key):
+                    path=annotation_resources[key];prior[path]=fingerprint(path,prior.get(path))
         if inferential and Path(c["CALIBRATION_REGISTRY"]).is_file():
             registry_path=c["CALIBRATION_REGISTRY"]
             prior[registry_path]=fingerprint(registry_path,prior.get(registry_path))
@@ -246,47 +290,36 @@ def register(c, scope):
         path.parent.mkdir(parents=True, exist_ok=True)
         np.savez_compressed(path, mask=common, labels=labels, **values)
         outputs += [path, save(bins, path.with_suffix(".bins.tsv")), save(views, path.with_suffix(".views.tsv"))]
+        audit = path.with_suffix(".scope.json")
+        atomic_json(audit, scope_record(c, samples, res, bins, common))
+        outputs.append(audit)
     return outputs
 
 
 def context(c, scope, resolution):
     base = Path(c["run_dir"])/f"00_metadata/masks/{resolution}"
-    archive = np.load(str(base)+".npz")
     bins = pd.read_csv(str(base)+".bins.tsv", sep="\t")
     views = pd.read_csv(str(base)+".views.tsv", sep="\t")
-    if scope.startswith("pool__"):
-        pool = next(p for p in read_json(Path(c["run_dir"])/"02_pools/registry.json")["pools"] if p["pool_id"] == scope[6:])
-        uri = pool["uris"][str(resolution)]
-        raw = cooler.Cooler(uri)
-        pool_config=dict(c,WEIGHT_COLUMN="weight",WEIGHT_CONVENTION="multiplicative") if pool.get("task_owned") else c
-        values = weights(raw, pool_config, read_json(pool["provenance_path"]), resolution)
-        values[~archive["mask"]] = np.nan
-    else:
-        sample = next(s for s in validate_metadata(c)["samples"] if s["sample_id"] == scope)
-        uri = matrix_uri(sample["matrix_path"], resolution)
-        values = archive[scope]
-    mask = archive["mask"] & np.isfinite(values)
-    return MaskedCooler(uri, values), bins, mask, archive["labels"], views, values
+    with np.load(str(base)+".npz") as archive:
+        if scope.startswith("pool__"):
+            pool = next(p for p in read_json(Path(c["run_dir"])/"02_pools/registry.json")["pools"] if p["pool_id"] == scope[6:])
+            uri = pool["uris"][str(resolution)]
+            raw = cooler.Cooler(uri)
+            pool_config=dict(c,WEIGHT_COLUMN="weight",WEIGHT_CONVENTION="multiplicative") if pool.get("task_owned") else c
+            values = weights(raw, pool_config, read_json(pool["provenance_path"]), resolution)[native_indices(raw, bins)]
+        else:
+            sample = next(s for s in validate_metadata(c)["samples"] if s["sample_id"] == scope)
+            uri = matrix_uri(sample_matrix(c, sample, resolution), resolution)
+            raw = cooler.Cooler(uri)
+            values = archive[scope]
+        common = archive["mask"] & np.isfinite(values)
+        native, mask, labels, values = native_domain(raw, bins, common, archive["labels"], values)
+    return MaskedCooler(uri, values), native, mask, labels, views, values
 
 
 def qc(c, scope):
-    outputs = []
-    if not c["RUN_QC"]:
-        path=Path(c["run_dir"])/f"01_qc/hicrep/inputs/{scope}.json"
-        atomic_json(path,{"sample_id":scope,"status":"raw_only_HiCRep_input_validated","resolution":c["HICREP_RESOLUTION"],"normalization":"raw_counts_no_balancing"})
-        return [path]
-    all_res={c["PS_RESOLUTION"]}
-    if c["RUN_LOOPS"]:all_res.add(c["LOOP_RESOLUTION"])
-    if c["RUN_LOOPS"] and c["LOOP_SENSITIVITY_RESOLUTIONS"]:all_res.add(int(c["LOOP_SENSITIVITY_RESOLUTIONS"]))
-    all_res=sorted(all_res)
-    for res in all_res:
-        clr, bins, mask, labels, views, values = context(c, scope, res)
-        summary = raw_summary(clr, bins, mask, labels, c)
-        path = Path(c["run_dir"])/f"01_qc/contacts/{scope}.{res}.json"
-        atomic_json(path, dict(summary, sample_id=scope, resolution=res, normalization="inherited_upstream_weights"))
-        expected = expected_table(clr, bins, mask, labels, views, values, c)
-        outputs += [path, save(expected, Path(c["run_dir"])/f"01_qc/ps/{scope}.{res}.tsv")]
-    return outputs
+    from .qc_parallel import run
+    return run(c, scope)
 
 
 def phasing_track(c, bins):
@@ -295,8 +328,18 @@ def phasing_track(c, bins):
     track = pd.read_csv(ref["phasing_track"], sep="\t", header=None, names=["chrom", "start", "end", "value"])
     # Exact grid is required; no hidden interpolation/lift-over.
     merged = bins.merge(track, on=["chrom", "start", "end"], how="left", validate="one_to_one")
+    merged["value"] = pd.to_numeric(merged["value"], errors="raise")
+    require(not np.isinf(merged.value.to_numpy(dtype=float)).any(), "Phasing track contains infinite values")
     require(merged.value.notna().any(), "Phasing track has no matching bins")
     return merged
+
+
+def registered_table(c, resolution, frame):
+    """Export feature measurements on the common ordered grid, not native IDs."""
+    base = pd.read_csv(Path(c["run_dir"])/f"00_metadata/masks/{resolution}.bins.tsv", sep="\t")
+    frame = frame.copy()
+    frame["chrom"] = frame.chrom.astype(str)
+    return base.merge(frame, on=["chrom", "start", "end"], how="left", validate="one_to_one")
 
 
 def compartments(c, scope):
@@ -313,7 +356,10 @@ def compartments(c, scope):
     require(estimated<=c["MEMORY_MB_COMPARTMENTS"]*1000000,"Concurrent compartment arrays exceed provisional memory bound; reduce workers/views or increase a measured reservation")
     from multiprocess import Pool
     with Pool(workers) as pool:
-        eigenvalues, vectors = cooltools.eigs_cis(clr, view_df=views, n_eigs=3, clr_weight_name="weight", ignore_diags=c["INSULATION_IGNORE_DIAGS"],map=pool.map)
+        eigenvalues, vectors = cooltools.eigs_cis(clr, view_df=tool_views(clr,views), n_eigs=3, clr_weight_name="weight", ignore_diags=c["INSULATION_IGNORE_DIAGS"],map=pool.map)
+    vectors = registered_table(c, c["COMPARTMENT_RESOLUTION"], vectors)
+    name_column = "name" if "name" in eigenvalues else "region"
+    eigenvalues = eigenvalues.set_index(name_column,drop=False).loc[views.name].reset_index(drop=True)
     vectors = vectors.merge(phase_values, on=["chrom", "start", "end"], how="left", validate="one_to_one")
     vectors["oriented_score"] = np.nan
     vectors["selected_component"] = pd.NA
@@ -342,7 +388,8 @@ def insulation(c, scope):
     import cooltools
     clr, bins, mask, labels, views, values = context(c, scope, c["INSULATION_RESOLUTION"])
     windows = [int(x) for x in c["INSULATION_WINDOWS_BP"].split(",")]
-    table = cooltools.insulation(clr, windows, view_df=views, clr_weight_name="weight", ignore_diags=c["INSULATION_IGNORE_DIAGS"], min_frac_valid_pixels=c["INSULATION_MIN_VALID_PIXEL_FRACTION"], threshold=c["INSULATION_BOUNDARY_THRESHOLD"], append_raw_scores=True, chunksize=c["PIXEL_CHUNKSIZE"], nproc=c["THREADS_INSULATION"])
+    table = cooltools.insulation(clr, windows, view_df=tool_views(clr,views), clr_weight_name="weight", ignore_diags=c["INSULATION_IGNORE_DIAGS"], min_frac_valid_pixels=c["INSULATION_MIN_VALID_PIXEL_FRACTION"], threshold=c["INSULATION_BOUNDARY_THRESHOLD"], append_raw_scores=True, chunksize=c["PIXEL_CHUNKSIZE"], nproc=c["THREADS_INSULATION"])
+    table = registered_table(c, c["INSULATION_RESOLUTION"], table)
     for window in windows:
         width=window//c["INSULATION_RESOLUTION"]
         theoretical=sum(a+b>=c["INSULATION_IGNORE_DIAGS"] for a in range(width) for b in range(width))
@@ -352,7 +399,8 @@ def insulation(c, scope):
         table.loc[insufficient,[f"log2_insulation_score_{window}",f"boundary_strength_{window}"]]=np.nan
         table.loc[insufficient,f"is_boundary_{window}"]=False
     if "region" not in table:
-        table["region"] = [views.iloc[labels[i]]["name"] if labels[i] >= 0 else pd.NA for i in table.index]
+        table_labels = view_labels(table, views)
+        table["region"] = [views.iloc[label]["name"] if label >= 0 else pd.NA for label in table_labels]
     table["inference_status"] = "per_sample_measurement"
     outputs = [save(table, Path(c["run_dir"])/f"03_features/insulation/{scope}.tsv")]
     for window in windows:
@@ -363,72 +411,156 @@ def insulation(c, scope):
 
 
 def loops(c, scope):
-    import cooltools
     outputs = []
-    for res in [c["LOOP_RESOLUTION"]] + ([int(c["LOOP_SENSITIVITY_RESOLUTIONS"])] if c["LOOP_SENSITIVITY_RESOLUTIONS"] else []):
+    for res in loop_resolutions(c):
         clr, bins, mask, labels, views, values = context(c, scope, res)
-        expected_path = Path(c["run_dir"])/f"01_qc/ps/{scope}.{res}.tsv"
-        expected = pd.read_csv(expected_path, sep="\t") if expected_path.exists() else expected_table(clr, bins, mask, labels, views, values, c)
-        calls = cooltools.dots(clr, expected, expected_value_col="balanced.avg", clr_weight_name="weight", view_df=views, max_loci_separation=c["LOOP_MAX_DISTANCE_BP"], nproc=c["THREADS_LOOPS"])
+        if c["LOOP_CALLER"] == "mustache":
+            from .fine_loops import mustache_calls
+            calls = mustache_calls(c,clr,bins,mask,labels,views,values,res)
+        else:
+            import cooltools
+            expected_path = Path(c["run_dir"])/f"01_qc/ps/{scope}.{res}.tsv"
+            expected = pd.read_csv(expected_path, sep="\t") if expected_path.exists() else expected_table(clr, bins, mask, labels, views, values, c)
+            calls = cooltools.dots(clr, expected, expected_value_col="balanced.avg", clr_weight_name="weight", view_df=tool_views(clr,views), max_loci_separation=c["LOOP_MAX_DISTANCE_BP"], nproc=c["THREADS_LOOPS"])
+        resource_plans = calls.attrs.get('resource_plans', [])
+        from .loop_profiles import mustache_geometry
+        geometry = mustache_geometry(c, res) if c['LOOP_CALLER'] == 'mustache' else None
         if len(calls):
             calls = calls.loc[(calls.chrom1 == calls.chrom2) & (calls.start2-calls.start1 >= c["LOOP_MIN_DISTANCE_BP"]) & (calls.start2-calls.start1 <= c["LOOP_MAX_DISTANCE_BP"])]
             calls = canonical_loops(calls, c["REFERENCE_ID"], res)
         else:
             calls = pd.DataFrame(columns=LOOP_COLUMNS)
-        calls["caller"] = "cooltools_dots"; calls["resolution"] = res
+        calls["caller"] = c["LOOP_CALLER"]; calls["resolution"] = res
         calls["inference_status"] = "discovery_enrichment_only"
         outputs += [save(calls, Path(c["run_dir"])/f"03_features/loops/{scope}.{res}.bedpe.tsv")]
+        provenance=Path(c["run_dir"])/f"03_features/loops/{scope}.{res}.json"
+        atomic_json(provenance,{"sample_id":scope,"resolution":res,"matrix_uri":clr.uri,"caller":c["LOOP_CALLER"],
+                    "software_inventory":inventory(),"condition_pool":scope.startswith("pool__"),
+                    "normalization":"inherited_stored_weights; common-mask excluded pixels unavailable",
+                    "min_distance_bp":c["LOOP_MIN_DISTANCE_BP"],"max_distance_bp":c["LOOP_MAX_DISTANCE_BP"],
+                    "caller_intrinsic_excluded_diagonals":4 if c["LOOP_CALLER"]=="mustache" else None,
+                    "effective_minimum_candidate_bin_distance_bp":geometry['effective_best_case_min_distance_bp'] if geometry else c["LOOP_MIN_DISTANCE_BP"],
+                    "geometry": geometry, "resource_plans": resource_plans,
+                    "parameters":{k:v for k,v in c.items() if k.startswith("MUSTACHE_")},"profile":c["ANALYSIS_PROFILE"],
+                    "methods_status":"adapted; not an exact Hsieh reproduction"})
+        outputs.append(provenance)
     return outputs
 
 
 def consensus(c, scope):
     root = Path(c["run_dir"])
     outputs = []
-    frames = {sid:pd.read_csv(root/f"03_features/loops/{sid}.{c['LOOP_RESOLUTION']}.bedpe.tsv",sep="\t") for sid in stage_scopes(c,"loops")} if c["RUN_LOOPS"] else {}
-    loops_frame = consensus_loops(frames, c["REFERENCE_ID"], c["LOOP_RESOLUTION"], c["LOOP_CONSENSUS_TOLERANCE_BINS"])
+    sources=[]
+    if c["RUN_LOOPS"]:
+        for res in loop_resolutions(c):
+            frames={sid:pd.read_csv(root/f"03_features/loops/{sid}.{res}.bedpe.tsv",sep="\t").assign(caller=c["LOOP_CALLER"]) for sid in stage_scopes(c,"loops")}
+            sources.extend((sid,res,frame) for sid,frame in frames.items())
+            outputs.append(save(consensus_loops(frames,c["REFERENCE_ID"],res,c["LOOP_CONSENSUS_TOLERANCE_BINS"]),root/f"03_features/loops/consensus.{res}.tsv"))
+    if c.get("RUN_CHROMOSIGHT_DISCOVERY"):
+        from .resolutions import chromosight_discovery_resolutions
+        for res in chromosight_discovery_resolutions(c):
+            frames = {sid: pd.read_csv(root/f"03_features/loops/{sid}.{res}.chromosight.tsv", sep="\t") for sid in stage_scopes(c, "chromosight_discovery")}
+            sources.extend((sid, res, frame) for sid, frame in frames.items())
+    from .fine_loops import cross_resolution_catalogue, map_candidates
+    catalogue,members=cross_resolution_catalogue(c,sources)
+    outputs += [save(catalogue,root/"03_features/loops/catalogue.tsv"),save(members,root/"03_features/loops/source_membership.tsv")]
+    loops_frame,_=map_candidates(catalogue,c["REFERENCE_ID"],c["LOOP_RESOLUTION"])
     outputs += [save(loops_frame, root/"03_features/loops/consensus.tsv")]
     domains = []
     if c["RUN_INSULATION"]:
+        with np.load(root/f"00_metadata/masks/{c['INSULATION_RESOLUTION']}.npz") as archive:
+            common_mask = archive["mask"].copy()
+        bins = pd.read_csv(root/f"00_metadata/masks/{c['INSULATION_RESOLUTION']}.bins.tsv", sep="\t")
+        domain_index = masked_interval_index(bins, common_mask)
         for window in map(int, c["INSULATION_WINDOWS_BP"].split(",")):
             boundaries = {sid:pd.read_csv(root/f"03_features/boundaries/{sid}.{window}.tsv",sep="\t") for sid in stage_scopes(c,"insulation")}
             merged = boundary_consensus(boundaries, c["REFERENCE_ID"], c["INSULATION_RESOLUTION"], window)
             outputs += [save(merged, root/f"03_features/boundaries/consensus.{window}.tsv")]
-            archive = np.load(root/f"00_metadata/masks/{c['INSULATION_RESOLUTION']}.npz")
-            bins = pd.read_csv(root/f"00_metadata/masks/{c['INSULATION_RESOLUTION']}.bins.tsv", sep="\t")
             for (chrom, region), group in merged.groupby(["chrom", "region"]):
                 positions = sorted(group.start)
                 for start, end in zip(positions, positions[1:]):
-                    inside = (bins.chrom.astype(str) == chrom) & (bins.start >= start) & (bins.end <= end)
-                    if not inside.any() or not archive["mask"][inside].all(): continue
+                    if not interval_usable(domain_index, chrom, start, end): continue
                     domains.append({"chrom":chrom, "start":start, "end":end, "region":region, "window_bp":window,
                                     "feature_id":feature_id("domain",c["REFERENCE_ID"],(chrom,start,end,window),c["INSULATION_RESOLUTION"]), "inference_status":"descriptive"})
     outputs += [save(pd.DataFrame(domains, columns=["chrom","start","end","region","window_bp","feature_id","inference_status"]), root/"03_features/boundary_derived_domains/consensus.tsv")]
     return outputs
 
 
+def masked_interval_index(bins, mask):
+    result = {}
+    for chrom, frame in bins.groupby("chrom", sort=False, observed=True):
+        frame = frame.sort_values("start")
+        starts, ends = frame.start.to_numpy(), frame.end.to_numpy()
+        require((np.diff(ends) >= 0).all(), "Registered bin ends must be ordered")
+        result[str(chrom)] = (starts, ends, np.r_[0, np.cumsum(~mask[frame.index])])
+    return result
+
+
+def interval_usable(index, chrom, start, end):
+    if chrom not in index:
+        return False
+    starts, ends, bad = index[chrom]
+    a = int(np.searchsorted(starts, start, side="left"))
+    b = int(np.searchsorted(ends, end, side="right"))
+    return b > a and bad[b] == bad[a]
+
+
 def quantify_features(c, scope):
     root = Path(c["run_dir"])
     samples = validate_metadata(c)["samples"]
-    discovered_path = root/"03_features/loops/consensus.tsv"
-    discovered = pd.read_csv(discovered_path,sep="\t") if c["RUN_LOOPS"] and discovered_path.exists() else pd.DataFrame(columns=LOOP_COLUMNS)
+    discovered_path = root/"03_features/loops/catalogue.tsv"
+    discovered = pd.read_csv(discovered_path,sep="\t") if has_loop_discovery(c) and discovered_path.exists() else pd.DataFrame(columns=LOOP_COLUMNS)
     independent, registry = external_features(c,samples)
     outputs=[]
-    for name, universe in (("independent_loops",independent),("discovered_loops",discovered)):
-        universe = universe.reset_index(drop=True)
-        matrix=universe[LOOP_COLUMNS].copy()
-        exposure_rows, exclusions=[],[]
-        for sample in samples:
-            clr,bins,mask,labels,views,values=context(c,sample["sample_id"],c["LOOP_RESOLUTION"])
-            counts,exposure,reasons=quantify(clr,universe,bins,mask,labels,c)
-            matrix[sample["sample_id"]]=counts
-            exposure_rows.append({"sample_id":sample["sample_id"],"eligible_cis_exposure":exposure})
-            exclusions.extend({"sample_id":sample["sample_id"],"feature_id":universe.loc[i,"feature_id"],"reason":reason} for i,reason in reasons.items())
-        directory=root/"04_quantification"/name
-        outputs += [save(matrix,directory/"counts.tsv"),save(pd.DataFrame(exposure_rows),directory/"exposures.tsv"),save(pd.DataFrame(exclusions,columns=["sample_id","feature_id","reason"]),directory/"exclusions.tsv")]
-        provenance=directory/"features.json"
-        atomic_json(provenance,{"inference_status":"independent_candidates" if name=="independent_loops" and registry else "descriptive_same_data", "registry":registry if name=="independent_loops" else None, "feature_hash":digest(universe[LOOP_COLUMNS].to_dict("records"))})
-        outputs.append(provenance)
+    from .fine_loops import map_candidates
+    for resolution in quantification_resolutions(c):
+        measurements = {}
+        for name, universe in (("independent_loops", independent), ("discovered_loops", discovered)):
+            measurement, aliases = map_candidates(universe.reset_index(drop=True), c["REFERENCE_ID"], resolution)
+            measurements[name] = (measurement, aliases)
+        matrices = {name: frame[LOOP_COLUMNS].copy() for name, (frame, _) in measurements.items()}
+        exposure_rows = []
+        exclusions_by_name = {name: [] for name in measurements}
+        from .quantification import quantify_observations
+        sample_results = quantify_observations(c, samples, resolution, measurements)
+        for sample, results in zip(samples, sample_results):
+            for name, (counts, exposure, reasons) in results.items():
+                matrices[name][sample["sample_id"]] = counts
+                measurement = measurements[name][0]
+                exclusions_by_name[name].extend({"sample_id": sample["sample_id"], "feature_id": measurement.loc[i, "feature_id"], "reason": reason} for i, reason in reasons.items())
+            exposure_rows.append({"sample_id": sample["sample_id"], "eligible_cis_exposure": exposure, "resolution": resolution})
+        for name, (measurement, aliases) in measurements.items():
+            matrix = matrices[name]
+            exclusions = exclusions_by_name[name]
+            directory=root/"04_quantification"/name/str(resolution)
+            tables={"counts.tsv":matrix,"exposures.tsv":pd.DataFrame(exposure_rows),"exclusions.tsv":pd.DataFrame(exclusions,columns=["sample_id","feature_id","reason"]),"candidate_mapping.tsv":aliases}
+            for filename,table in tables.items():
+                outputs.append(save(table,directory/filename))
+                if resolution==c["LOOP_RESOLUTION"]: outputs.append(save(table,directory.parent/filename))
+            info={"inference_status":"independent_candidates" if name=="independent_loops" and registry else "descriptive_same_data", "registry":registry if name=="independent_loops" else None, "feature_hash":digest(measurement[LOOP_COLUMNS].to_dict("records")),"resolution":resolution,"collapsed_candidates_are_one_measurement":True}
+            provenance=directory/"features.json";atomic_json(provenance,info);outputs.append(provenance)
+            if resolution==c["LOOP_RESOLUTION"]:
+                provenance=directory.parent/"features.json";atomic_json(provenance,info);outputs.append(provenance)
     return outputs
+
+
+def expected_lookup(expected):
+    """Build distance arrays once for an immutable sample/resolution context.
+
+    This is an in-memory lookup, never a cache reused across runs or masks.
+    """
+    if isinstance(expected, dict):
+        return expected
+    result = {}
+    for (left, right), frame in expected.groupby(["region1", "region2"], sort=False):
+        if left != right:
+            continue
+        distances = frame.dist.to_numpy(dtype=int)
+        require((distances >= 0).all(), "Expected contact distances must be nonnegative")
+        values = np.full(int(distances.max())+1 if len(distances) else 0, np.nan)
+        values[distances] = frame["balanced.avg"].to_numpy()
+        result[left] = values
+    return result
 
 
 def oe_window(clr, region1, region2, values, labels, views, expected, c):
@@ -438,16 +570,14 @@ def oe_window(clr, region1, region2, values, labels, views, expected, c):
     i=np.arange(lo,hi)[:,None]; j=np.arange(lo2,hi2)[None,:]
     distance=np.abs(j-i)
     denominator=np.full(result.shape,np.nan)
+    lookup_by_view = expected_lookup(expected)
     for vid in np.unique(labels[lo:hi]):
         if vid<0:continue
         name=views.iloc[vid]["name"]
-        ex=expected.loc[(expected.region1==name)&(expected.region2==name)].set_index("dist")["balanced.avg"]
+        lookup = lookup_by_view.get(name, np.empty(0))
         same=(labels[lo:hi,None]==vid)&(labels[None,lo2:hi2]==vid)
-        lookup=np.full(max(int(distance.max())+1,1),np.nan)
-        indices=ex.index.to_numpy(dtype=int)
-        valid=indices<len(lookup)
-        lookup[indices[valid]]=ex.to_numpy()[valid]
-        denominator[same]=lookup[distance[same]]
+        valid = same & (distance < len(lookup))
+        denominator[valid]=lookup[distance[valid]]
     good=np.isfinite(denominator)&(denominator>0)&np.isfinite(result)
     return np.divide(result,denominator,out=np.full(result.shape,np.nan),where=good)
 
@@ -484,38 +614,44 @@ def saddle_partition(c, samples):
     return base,labels
 
 
-def aggregates(c,scope):
+def _aggregates_single(c,scope):
     modules=aggregate_modules(c)
     root=Path(c["run_dir"])
+    apa_directory=root/'05_aggregates/apa'
+    if c.get('_apa_resolution'):apa_directory=apa_directory/str(c['_apa_resolution'])
     samples=validate_metadata(c)["samples"]
     loops_path=root/"03_features/loops/consensus.tsv"
-    discovered=pd.read_csv(loops_path,sep="\t") if "apa" in modules and c["RUN_LOOPS"] and loops_path.exists() else pd.DataFrame(columns=LOOP_COLUMNS)
-    independent,_=external_features(c,samples) if "apa" in modules else (pd.DataFrame(columns=LOOP_COLUMNS), None)
-    universe=independent if len(independent) else discovered
+    discovered=pd.read_csv(loops_path,sep="\t") if "apa" in modules and has_loop_discovery(c) and loops_path.exists() else pd.DataFrame(columns=LOOP_COLUMNS)
+    independent,_=external_features(c,samples) if "apa" in modules and not c.get("_apa_ignore_external_registry") else (pd.DataFrame(columns=LOOP_COLUMNS), None)
+    universe=c.get("_apa_candidates",independent if len(independent) else discovered)
     domains_path=root/"03_features/boundary_derived_domains/consensus.tsv"
     domains=pd.read_csv(domains_path,sep="\t") if "ada" in modules and c["RUN_INSULATION"] and domains_path.exists() else pd.DataFrame()
     if len(domains):domains=domains.loc[domains.window_bp==c["INSULATION_PRIMARY_WINDOW_BP"]]
     outputs=[]; summaries=[]; domain_rows=[]
-    for sample in samples if modules & {"apa", "ada"} else []:
+    selected_samples = [s for s in samples if not c.get("_aggregate_sample_id") or s["sample_id"] == c["_aggregate_sample_id"]]
+    unit_dir = Path(c["_aggregate_unit_dir"]) if c.get("_aggregate_unit_dir") else None
+    from .aggregation import atomic_npz
+    from .expected_cache import expected_cached
+    for sample in selected_samples if modules & {"apa", "ada"} else []:
         sid=sample["sample_id"];res=c["LOOP_RESOLUTION"]
         clr,bins,mask,labels,views,values=context(c,sid,res)
-        expected=expected_table(clr,bins,mask,labels,views,values,c)
+        expected=expected_lookup(expected_cached(c,sid,res,clr,bins,mask,labels,views,values))
         if "apa" in modules:
-            flank=100000//res; shape=2*flank+1
+            flank=c["APA_FLANK_BP"]//res; shape=2*flank+1
             total=np.zeros((shape,shape));coverage=np.zeros((shape,shape),dtype=int)
             for feature in universe.itertuples():
-                region1=(feature.chrom1,feature.start1-100000,feature.end1+100000)
-                region2=(feature.chrom2,feature.start2-100000,feature.end2+100000)
+                region1=(feature.chrom1,feature.start1-c["APA_FLANK_BP"],feature.end1+c["APA_FLANK_BP"])
+                region2=(feature.chrom2,feature.start2-c["APA_FLANK_BP"],feature.end2+c["APA_FLANK_BP"])
                 if region1[1]<0 or region2[1]<0 or region1[2]>clr.chromsizes[feature.chrom1] or region2[2]>clr.chromsizes[feature.chrom2]:continue
                 window=oe_window(clr,region1,region2,values,labels,views,expected,c)
                 if window.shape!=total.shape:continue
                 good=np.isfinite(window)
                 total[good]+=window[good];coverage[good]+=1
             average=np.divide(total,coverage,out=np.full(total.shape,np.nan),where=coverage>0)
-            path=root/f"05_aggregates/apa/{sid}.npz";path.parent.mkdir(parents=True,exist_ok=True)
-            np.savez_compressed(path,mean=average,sum=total,valid_feature_count=coverage)
+            path=apa_directory/f"{sid}.npz";path.parent.mkdir(parents=True,exist_ok=True)
+            atomic_npz(path,mean=average,sum=total,valid_feature_count=coverage)
             outputs.append(path)
-            summaries.append({"sample_id":sid,"central_oe":average[flank,flank],"central_valid_features":coverage[flank,flank],"central_3x3_oe":float(np.nanmean(average[flank-1:flank+2,flank-1:flank+2])) if np.isfinite(average).any() else np.nan,"inference_status":"descriptive"})
+            summaries.append({"sample_id":sid,"resolution":res,"requested_features":len(universe),"central_oe":average[flank,flank],"central_valid_features":coverage[flank,flank],"central_3x3_oe":float(np.nanmean(average[flank-1:flank+2,flank-1:flank+2])) if np.isfinite(average).any() else np.nan,"inference_status":"descriptive"})
         if "ada" in modules:
             ada_total=np.zeros((50,50));ada_count=np.zeros((50,50),dtype=int)
             for feature in domains.itertuples():
@@ -530,23 +666,27 @@ def aggregates(c,scope):
                     block=window[cuts[i]:cuts[i+1],cuts[j]:cuts[j+1]]
                     if np.isfinite(block).any():ada_total[i,j]+=float(np.nanmean(block));ada_count[i,j]+=1
             path=root/f"05_aggregates/ada/{sid}.npz";path.parent.mkdir(parents=True,exist_ok=True)
-            np.savez_compressed(path,mean=np.divide(ada_total,ada_count,out=np.full((50,50),np.nan),where=ada_count>0),sum=ada_total,valid_domain_count=ada_count)
+            atomic_npz(path,mean=np.divide(ada_total,ada_count,out=np.full((50,50),np.nan),where=ada_count>0),sum=ada_total,valid_domain_count=ada_count)
             outputs.append(path)
     if "apa" in modules:
-        outputs.append(save(pd.DataFrame(summaries),root/"05_aggregates/apa/summary.tsv"))
+        outputs.append(save(pd.DataFrame(summaries),(unit_dir/"summary.tsv") if unit_dir else apa_directory/"summary.tsv"))
     if "ada" in modules:
-        outputs.append(save(pd.DataFrame(domain_rows,columns=["feature_id","sample_id","mean_intra_domain_oe","oe_sum","eligible_pixel_count","inference_status"]),root/"04_quantification/domain_scores/strength.tsv"))
+        outputs.append(save(pd.DataFrame(domain_rows,columns=["feature_id","sample_id","mean_intra_domain_oe","oe_sum","eligible_pixel_count","inference_status"]),(unit_dir/"strength.tsv") if unit_dir else root/"04_quantification/domain_scores/strength.tsv"))
     if "saddle" in modules:
-        partition,labels=saddle_partition(c,samples)
-        outputs.append(save(partition,root/"05_aggregates/saddle/partition.tsv"))
+        partition,labels=c["_saddle_partition"] if c.get("_saddle_partition") is not None else saddle_partition(c,samples)
+        require((partition.partition >= 0).any(),
+                "Saddle has no eligible partition: each usable view needs at least 50 common, consistently oriented bins; inspect compartment phasing QC and the registered track/grid")
+        if unit_dir is None: outputs.append(save(partition,root/"05_aggregates/saddle/partition.tsv"))
         info=root/"05_aggregates/saddle/partition.json"
-        atomic_json(info,{"source":c["SADDLE_PARTITION_SOURCE"],"groups":50,"partition_hash":digest(partition[["chrom","start","end","partition"]].to_dict("records")),"views":[{"view_index":int(vid),"usable_bins":int(((labels==vid)&(partition.partition.to_numpy()>=0)).sum()),"status":"partitioned" if ((labels==vid)&(partition.partition.to_numpy()>=0)).sum()>=50 else "fewer_than_50_usable_bins"} for vid in np.unique(labels[labels>=0])],"inference_status":"descriptive"})
-        outputs.append(info)
+        if unit_dir is None: atomic_json(info,{"source":c["SADDLE_PARTITION_SOURCE"],"groups":50,"partition_hash":digest(partition[["chrom","start","end","partition"]].to_dict("records")),"views":[{"view_index":int(vid),"usable_bins":int(((labels==vid)&(partition.partition.to_numpy()>=0)).sum()),"status":"partitioned" if ((labels==vid)&(partition.partition.to_numpy()>=0)).sum()>=50 else "fewer_than_50_usable_bins"} for vid in np.unique(labels[labels>=0])],"inference_status":"descriptive"})
+        if unit_dir is None: outputs.append(info)
         saddle_rows=[]
-        for sample in samples:
+        for sample in selected_samples:
             sid=sample["sample_id"];clr,bins,mask,labels,views,values=context(c,sid,c["COMPARTMENT_RESOLUTION"])
-            ex=expected_table(clr,bins,mask,labels,views,values,c)
-            assignments=partition.partition.to_numpy();sums=np.zeros((50,50));counts=np.zeros((50,50),dtype=np.int64)
+            ex=expected_lookup(expected_cached(c,sid,c["COMPARTMENT_RESOLUTION"],clr,bins,mask,labels,views,values))
+            assignments=np.full(len(bins),-1,dtype=int)
+            assignments[native_indices(clr,partition[["chrom","start","end"]])]=partition.partition.to_numpy()
+            sums=np.zeros((50,50));counts=np.zeros((50,50),dtype=np.int64)
             # Dense per-view only after a hard bound; no genome-wide dense matrix.
             for vid,view in enumerate(views.itertuples()):
                 ids=np.flatnonzero(labels==vid)
@@ -560,12 +700,62 @@ def aggregates(c,scope):
                     sums[a,b]+=np.nansum(block);counts[a,b]+=good.sum()
             average=np.divide(sums,counts,out=np.full((50,50),np.nan),where=counts>0)
             path=root/f"05_aggregates/saddle/{sid}.npz";path.parent.mkdir(parents=True,exist_ok=True)
-            np.savez_compressed(path,mean=average,sum=sums,valid_pixel_count=counts);outputs.append(path)
+            atomic_npz(path,mean=average,sum=sums,valid_pixel_count=counts);outputs.append(path)
             def corner(x,y):
                 n=counts[x,y].sum();return sums[x,y].sum()/n if n else np.nan
             aa=corner(slice(40,50),slice(40,50));bb=corner(slice(0,10),slice(0,10));ab=corner(slice(0,10),slice(40,50))
             saddle_rows.append({"sample_id":sid,"AA":aa,"BB":bb,"AB":ab,"segregation_ratio":(aa+bb)/(2*ab) if np.isfinite(ab) and ab>0 else np.nan,"inference_status":"descriptive"})
-        outputs.append(save(pd.DataFrame(saddle_rows),root/"05_aggregates/saddle/summary.tsv"))
+        outputs.append(save(pd.DataFrame(saddle_rows),(unit_dir/"summary.tsv") if unit_dir else root/"05_aggregates/saddle/summary.tsv"))
+    return outputs
+
+
+def aggregates(c,scope):
+    """Independent ADA/saddle branches and a complete APA path per loop grid."""
+    modules=aggregate_modules(c);root=Path(c["run_dir"]);outputs=[]
+    for module in sorted(modules):
+        resolutions=quantification_resolutions(c) if module=="apa" else [c["ADA_RESOLUTION"]] if module=="ada" else [c["COMPARTMENT_RESOLUTION"]]
+        for res in resolutions:
+            config=dict(c,AGGREGATE_MODULES=module,LOOP_RESOLUTION=res)
+            if module=="apa":
+                config['_apa_resolution']=res
+                # Fixed cross-resolution universe, mapped once per measured pixel.
+                catalogue=root/"03_features/loops/catalogue.tsv"
+                from .fine_loops import map_candidates
+                if has_loop_discovery(c) and catalogue.exists():
+                    mapped,_=map_candidates(pd.read_csv(catalogue,sep="\t"),c["REFERENCE_ID"],res)
+                    config["_apa_candidates"]=mapped
+                independent,_=external_features(c,validate_metadata(c)["samples"])
+                if len(independent): config["_apa_candidates"]=map_candidates(independent,c["REFERENCE_ID"],res)[0]
+                config["_apa_ignore_external_registry"]=True
+            from .aggregation import run_units, atomic_npz
+            products=run_units(config,module,res)
+            if module=="apa":
+                for path in products:
+                    outputs.append(path)
+                    if res==c["LOOP_RESOLUTION"]:
+                        alias=path.parent.parent/path.name;shutil.copyfile(path,alias);outputs.append(alias)
+            else: outputs.extend(products)
+            if module == "ada":
+                domain_path = root/"03_features/boundary_derived_domains/consensus.tsv"
+                requested = pd.read_csv(domain_path, sep="\t")
+                requested = requested.loc[requested.window_bp == c["INSULATION_PRIMARY_WINDOW_BP"]].copy()
+                outputs.append(save(requested, root/"05_aggregates/ada/requested_domains.tsv"))
+                contribution_path = root/"05_aggregates/ada/contributions.tsv"
+                scores = pd.read_csv(root/"04_quantification/domain_scores/strength.tsv", sep="\t")
+                scores['status'] = np.where(scores.eligible_pixel_count > 0, 'eligible_scalar_pixels', 'no_eligible_scalar_pixels')
+                outputs.append(save(scores, contribution_path))
+            location=root/"05_aggregates"/module/(str(res) if module=="apa" else "")
+            samples=validate_metadata(c)["samples"]
+            for condition in sorted({s["condition"] for s in samples}):
+                members=[s for s in samples if s["condition"]==condition]
+                arrays=[np.load(location/f"{s['sample_id']}.npz")["mean"] for s in members]
+                stack=np.stack(arrays);valid=np.isfinite(stack);count=valid.sum(axis=0)
+                average=np.divide(np.nansum(stack,axis=0),count,out=np.full(stack.shape[1:],np.nan),where=count>0)
+                condition_id=condition if IDENTIFIER.fullmatch(condition) else 'condition_'+digest(condition)[:12]
+                path=location/("condition__"+condition_id+".npz")
+                atomic_npz(path,mean=average,valid_replicate_count=count);outputs.append(path)
+            metadata_path=location/"aggregation.json"
+            atomic_json(metadata_path,{"module":module,"resolution":res,"condition_summary":"equal biological-replicate weighting; missing pixels excluded, never zero-filled","condition_members":{condition:[s["sample_id"] for s in samples if s["condition"]==condition] for condition in sorted({s["condition"] for s in samples})},"inference_status":"descriptive"});outputs.append(metadata_path)
     return outputs
 
 
@@ -581,6 +771,10 @@ def hicrep(c, scope, derived_root=None):
         if derived_root is not None:
             clr=cooler.Cooler(str(Path(derived_root)/left["sample_id"]/f"{c['HICREP_RESOLUTION']}.cool"))
             other=cooler.Cooler(str(Path(derived_root)/right["sample_id"]/f"{c['HICREP_RESOLUTION']}.cool"))
+            base=Path(c["run_dir"])/f"00_metadata/masks/{c['HICREP_RESOLUTION']}"
+            common_bins=pd.read_csv(str(base)+".bins.tsv",sep="\t")
+            with np.load(str(base)+".npz") as archive:
+                _,mask,_,_=native_domain(clr,common_bins,archive["mask"],archive["labels"],np.ones(len(common_bins)))
         for vid,view in enumerate(views.itertuples()):
             lo,hi=clr.extent((view.chrom,view.start,view.end))
             local=mask[lo:hi]
@@ -625,7 +819,7 @@ def balance_new_map(c,path,blacklist=None,cis_only=False):
     require(str(path) not in {v["path"] for v in inputs.values()},"Imported maps must never be balanced")
     clr=cooler.Cooler(str(path))
     for sample in validate_metadata(c)["samples"]:
-        source=cooler.Cooler(matrix_uri(sample["matrix_path"],clr.binsize))
+        source=cooler.Cooler(matrix_uri(sample_matrix(c,sample,clr.binsize),clr.binsize))
         if same_raw_counts(clr,source,c["PIXEL_CHUNKSIZE"]):
             raise ValueError("Derived map has unchanged imported counts; reuse its stored weights instead of balancing a copy")
     from multiprocessing import Pool
@@ -653,6 +847,9 @@ def same_raw_counts(left,right,chunk_size):
 
 def validate_pool_sum(raw, members, chunk_size):
     """Compare every pooled pixel to its member sum without constructing another map."""
+    axes=raw.bins()[:][["chrom","start","end"]].astype({"chrom":str})
+    require(all(clr.bins()[:][["chrom","start","end"]].astype({"chrom":str}).equals(axes) for clr in members),
+            "Imported pool raw-sum verification requires identical native member/pool grids; use explicit POOL_MODE=create for differing scopes")
     def entries(clr):
         for chunk in pixel_chunks(clr,chunk_size):
             for i,j,y in chunk[["bin1_id","bin2_id","count"]].itertuples(index=False,name=None):
@@ -688,13 +885,12 @@ def pools(c,scope):
             for res in resolution_set(c):
                 raw=cooler.Cooler(matrix_uri(row["matrix_path"],res))
                 bins=pd.read_csv(root/f"00_metadata/masks/{res}.bins.tsv",sep="\t")
-                actual=raw.bins()[:][["chrom","start","end"]].copy();actual["chrom"]=actual.chrom.astype(str)
-                require(np.array_equal(actual.to_numpy(),bins.to_numpy()),"Pool axes mismatch")
+                native_indices(raw,bins)
                 weights(raw,c,prov,res)
                 total=sum(int(p["count"].sum()) for p in pixel_chunks(raw,c["PIXEL_CHUNKSIZE"]))
-                wanted=sum(unordered_total(cooler.Cooler(matrix_uri(s["matrix_path"],res)),c["PIXEL_CHUNKSIZE"]) for s in samples if s["sample_id"] in members)
+                wanted=sum(unordered_total(cooler.Cooler(matrix_uri(sample_matrix(c,s,res),res)),c["PIXEL_CHUNKSIZE"]) for s in samples if s["sample_id"] in members)
                 require(total==wanted,"Imported pool raw total differs from member sum")
-                validate_pool_sum(raw,[cooler.Cooler(matrix_uri(s["matrix_path"],res)) for s in samples if s["sample_id"] in members],c["PIXEL_CHUNKSIZE"])
+                validate_pool_sum(raw,[cooler.Cooler(matrix_uri(sample_matrix(c,s,res),res)) for s in samples if s["sample_id"] in members],c["PIXEL_CHUNKSIZE"])
                 row["uris"][str(res)]=raw.uri
             row["task_owned"]=False;registered.append(row)
     if c["POOL_MODE"]=="create":
@@ -705,7 +901,7 @@ def pools(c,scope):
             require(all(ch.isalnum() or ch in "_.-" for ch in pool_id),"Pool condition requires a safe identifier")
             if len(members)==1:
                 sample=members[0]
-                registered.append({"pool_id":pool_id,"pool_scope":kind,"condition":condition,"member_sample_ids":sample["sample_id"],"provenance_path":sample["provenance_path"],"task_owned":False,"uris":{str(res):matrix_uri(sample["matrix_path"],res) for res in resolution_set(c)}})
+                registered.append({"pool_id":pool_id,"pool_scope":kind,"condition":condition,"member_sample_ids":sample["sample_id"],"provenance_path":sample["provenance_path"],"task_owned":False,"uris":{str(res):matrix_uri(sample_matrix(c,sample,res),res) for res in resolution_set(c)}})
                 continue
             require(c["BALANCE_NEW_DERIVED_MAPS"],"Creating pools for balanced discovery requires explicit new-map balancing")
             row={"pool_id":pool_id,"pool_scope":kind,"condition":condition,"member_sample_ids":";".join(s["sample_id"] for s in members),"task_owned":True,"uris":{}}
@@ -714,12 +910,20 @@ def pools(c,scope):
             prov={"reference_id":c["REFERENCE_ID"],"count_units":"unique_contacts","filters":source_prov["filters"],"balancing":{},"member_sample_ids":[s["sample_id"] for s in members],"member_hashes":{s["sample_id"]:input_records[s["matrix_path"].split("::")[0]]["sha256"] for s in members},"dedup_scope":"upstream_biological_members_already_deduplicated","library_ids":[lib for s in members for lib in read_json(s["provenance_path"])["library_ids"]],"source_ids":[source for s in members for source in read_json(s["provenance_path"])["source_ids"]],"summation":"raw_integer_sum"}
             for res in resolution_set(c):
                 path=root/f"02_pools/{pool_id}/{res}.cool";path.parent.mkdir(parents=True,exist_ok=True)
-                uris=[matrix_uri(s["matrix_path"],res) for s in members]
-                require(all(cooler.Cooler(u).info.get("storage-mode")=="symmetric-upper" for u in uris),
-                        "Explicit new pooling requires symmetric-upper members; request upstream pooling for square storage")
+                uris=[matrix_uri(sample_matrix(c,s,res),res) for s in members]
                 pending=path.with_name("."+path.name+".pending.cool")
-                cooler.merge_coolers(str(pending),uris,mergebuf=c["PIXEL_CHUNKSIZE"],columns=["count"],dtypes={"count":"int64"})
-                require(cooler.Cooler(str(pending)).info["sum"]==sum(cooler.Cooler(u).info["sum"] for u in uris),"New pool violates raw sum conservation")
+                bins=pd.read_csv(root/f"00_metadata/masks/{res}.bins.tsv",sep="\t")
+                expected_sum=[0]
+                def summed_chunks():
+                    for uri in uris:
+                        for chunk in aligned_pixel_chunks(cooler.Cooler(uri),bins,c["PIXEL_CHUNKSIZE"]):
+                            expected_sum[0]+=int(chunk["count"].sum())
+                            yield chunk
+                scratch=Path(c["SCRATCH_ROOT"]);scratch.mkdir(parents=True,exist_ok=True)
+                cooler.create_cooler(str(pending),bins,summed_chunks(),ordered=False,
+                                     mergebuf=c["PIXEL_CHUNKSIZE"],temp_dir=str(scratch),
+                                     dtypes={"count":"int64"},assembly=c["REFERENCE_ID"])
+                require(cooler.Cooler(str(pending)).info["sum"]==expected_sum[0],"New pool violates selected-coordinate raw sum conservation")
                 mask=np.load(root/f"00_metadata/masks/{res}.npz")["mask"]
                 balance_new_map(c,pending,blacklist=np.flatnonzero(~mask))
                 os.replace(pending,path)
@@ -739,7 +943,7 @@ def run_r(c,script,args):
     subprocess.run(command,check=True)
 
 
-def differential(c,scope):
+def _differential_single(c,scope):
     root=Path(c["run_dir"]);metadata=validate_metadata(c);outputs=[]
     for comparison in metadata["comparisons"]:
         if c.get("_comparison_modules"):
@@ -749,7 +953,9 @@ def differential(c,scope):
         ids=design["sample_ids"]
         case=[s["sample_id"] for s in metadata["samples"] if s["condition"]==comparison["case_condition"]]
         control=[s["sample_id"] for s in metadata["samples"] if s["condition"]==comparison["reference_condition"]]
-        directory=root/"06_comparisons"/comparison["comparison_id"];directory.mkdir(parents=True,exist_ok=True)
+        directory=root/"06_comparisons"/comparison["comparison_id"]
+        if c.get("_loop_measurement_resolution"):directory=directory/str(c["_loop_measurement_resolution"])
+        directory.mkdir(parents=True,exist_ok=True)
         status=check_calibration(c,comparison,read_json(root/"00_metadata/environments.json"))
         parameters={"design":design,"validation_status":status,"inference":comparison["inference"],"fdr":c["FDR_THRESHOLD"],"min_total":c["LOOP_MIN_TOTAL_COUNT"],"min_mean_at_min_exposure":c["LOOP_MIN_MEAN_COUNT_AT_MIN_EXPOSURE"],"min_features":c["LOOP_MIN_FEATURES_FORMAL"]}
         params=directory/"parameters.json";atomic_json(params,parameters);outputs.append(params)
@@ -757,9 +963,14 @@ def differential(c,scope):
             output=directory/(module+".tsv")
             if module=="loops":
                 kind="independent_loops" if comparison["inference"]!="descriptive" else "discovered_loops"
-                counts=pd.read_csv(root/f"04_quantification/{kind}/counts.tsv",sep="\t")
-                if comparison["inference"]=="descriptive" and not len(counts):counts=pd.read_csv(root/"04_quantification/independent_loops/counts.tsv",sep="\t")
-                exposures=pd.read_csv(root/f"04_quantification/{kind}/exposures.tsv",sep="\t").set_index("sample_id").eligible_cis_exposure
+                measurement=str(c.get("_loop_measurement_resolution",c["LOOP_RESOLUTION"]))
+                counts=pd.read_csv(root/f"04_quantification/{kind}/{measurement}/counts.tsv",sep="\t")
+                if comparison["inference"]=="descriptive" and not len(counts):
+                    kind="independent_loops"
+                    counts=pd.read_csv(root/f"04_quantification/{kind}/{measurement}/counts.tsv",sep="\t")
+                parameters.update(loop_universe=kind,measurement_resolution=int(measurement))
+                atomic_json(params,parameters)
+                exposures=pd.read_csv(root/f"04_quantification/{kind}/{measurement}/exposures.tsv",sep="\t").set_index("sample_id").eligible_cis_exposure
                 model_input=directory/"loop_model_counts.tsv";save(counts[LOOP_COLUMNS+ids],model_input);outputs.append(model_input)
                 exposure_input=directory/"loop_model_exposures.tsv";save(exposures.loc[ids].rename_axis("sample_id").reset_index(),exposure_input);outputs.append(exposure_input)
                 if comparison["inference"]!="descriptive":run_r(c,"differential_loops.R",[model_input,exposure_input,params,output])
@@ -795,6 +1006,22 @@ def differential(c,scope):
     return outputs
 
 
+def differential(c,scope):
+    modules=set(c.get('_comparison_modules',[])) or {module for comparison in validate_metadata(c)['comparisons'] for module in comparison['modules'].split(';')};outputs=[]
+    if "insulation" in modules:outputs.extend(_differential_single(dict(c,_comparison_modules=["insulation"]),scope))
+    if "loops" in modules:
+        for res in quantification_resolutions(c):
+            products=_differential_single(dict(c,LOOP_RESOLUTION=res,_loop_measurement_resolution=res,_comparison_modules=["loops"]),scope)
+            outputs.extend(products)
+            if res==c["LOOP_RESOLUTION"]:
+                for path in products:
+                    alias=path.parent.parent/path.name
+                    # Keep shared parameters when insulation already provided them.
+                    if path.name=="parameters.json" and alias in outputs:continue
+                    shutil.copyfile(path,alias);outputs.append(alias)
+    return list(dict.fromkeys(outputs))
+
+
 def depth_sensitivity(c,scope):
     root=Path(c["run_dir"]);samples=validate_metadata(c)["samples"]
     resolutions=resolution_set(c);fine=min(resolutions)
@@ -815,6 +1042,9 @@ def depth_sensitivity(c,scope):
         seed_maps=[]
         for sample_index,sample in enumerate(samples):
             sid=sample["sample_id"];clr,bins,mask,labels,views,values=contexts[sid]
+            common_bins=pd.read_csv(root/f"00_metadata/masks/{fine}.bins.tsv",sep="\t")
+            ids=native_indices(clr,common_bins)
+            mapping=np.full(len(bins),-1,dtype=np.int64);mapping[ids]=np.arange(len(common_bins))
             rng=np.random.default_rng(np.random.SeedSequence([c["RANDOM_SEED"],seed_index,sample_index]))
             probability=target/depths[sid];positions=bins.start.to_numpy()
             cutoff=read_json(sample["provenance_path"])["filters"]["min_distance_bp"]
@@ -825,9 +1055,14 @@ def depth_sensitivity(c,scope):
                     i,j=[chunk[k].to_numpy() for k in ("bin1_id","bin2_id")]
                     eligible=mask[i]&mask[j]&(labels[i]>=0)&(labels[i]==labels[j])&(positions[j]-positions[i]>=cutoff)
                     subset=chunk.loc[eligible].copy()
+                    a=mapping[subset.bin1_id.to_numpy()];b=mapping[subset.bin2_id.to_numpy()]
+                    subset["bin1_id"]=np.minimum(a,b);subset["bin2_id"]=np.maximum(a,b)
                     subset["count"]=rng.binomial(subset["count"].to_numpy(dtype=np.int64),probability)
-                    yield subset.loc[subset["count"]>0]
-            cooler.create_cooler(str(fine_path),bins,draw(),ordered=True,dtypes={"count":"int64"},assembly=c["REFERENCE_ID"])
+                    yield subset.loc[subset["count"]>0].sort_values(["bin1_id","bin2_id"])
+            scratch=Path(c["SCRATCH_ROOT"]);scratch.mkdir(parents=True,exist_ok=True)
+            cooler.create_cooler(str(fine_path),common_bins,draw(),ordered=False,
+                                 mergebuf=c["PIXEL_CHUNKSIZE"],temp_dir=str(scratch),
+                                 dtypes={"count":"int64"},assembly=c["REFERENCE_ID"])
             realized=int(cooler.Cooler(str(fine_path)).info["sum"])
             rows.append({"sample_id":sid,"seed_index":seed_index,"base_seed":c["RANDOM_SEED"],"probability":probability,"native_eligible_depth":depths[sid],"target_expected_depth":target,"realized_depth":realized,"generator":"numpy.PCG64","numpy_version":np.__version__,"inference_status":"descriptive_technical_sensitivity"})
             maps=[fine_path]
@@ -842,7 +1077,7 @@ def depth_sensitivity(c,scope):
                 localbins=raw.bins()[:][["chrom","start","end"]];localviews=pd.read_csv(root/f"00_metadata/masks/{res}.views.tsv",sep="\t")
                 localvalues=np.ones(len(localbins))
                 if c["DEPTH_SENSITIVITY_MODE"]=="balanced_features":
-                    original=cooler.Cooler(matrix_uri(sample["matrix_path"],res))
+                    original=cooler.Cooler(matrix_uri(sample_matrix(c,sample,res),res))
                     unchanged=same_raw_counts(raw,original,c["PIXEL_CHUNKSIZE"])
                     if unchanged:localvalues=archive[sid].copy()
                     else:
@@ -858,7 +1093,7 @@ def depth_sensitivity(c,scope):
                 if c["DEPTH_SENSITIVITY_MODE"]=="balanced_features" and res==c["INSULATION_RESOLUTION"] and c["RUN_INSULATION"]:
                     import cooltools
                     masked=MaskedCooler(str(path),localvalues)
-                    table=cooltools.insulation(masked,[c["INSULATION_PRIMARY_WINDOW_BP"]],view_df=localviews,ignore_diags=c["INSULATION_IGNORE_DIAGS"],min_frac_valid_pixels=c["INSULATION_MIN_VALID_PIXEL_FRACTION"],nproc=1)
+                    table=cooltools.insulation(masked,[c["INSULATION_PRIMARY_WINDOW_BP"]],view_df=tool_views(masked,localviews),ignore_diags=c["INSULATION_IGNORE_DIAGS"],min_frac_valid_pixels=c["INSULATION_MIN_VALID_PIXEL_FRACTION"],nproc=1)
                     table["inference_status"]="descriptive_technical_sensitivity"
                     outputs.append(save(table,directory/"insulation.tsv"))
                 if c["DEPTH_SENSITIVITY_MODE"]=="balanced_features" and res==c["LOOP_RESOLUTION"]:
@@ -918,4 +1153,10 @@ def cleanup_derived(c):
 IMPLEMENTATIONS={"preflight":lambda c,s:inspect_inputs(c,writing=True),"register":register,"qc":qc,
                  "pool":pools,"compartments":compartments,"insulation":insulation,"tads":lambda c,s:__import__("microc2compare.tads",fromlist=["run"]).run(c,s),"loops":loops,
                  "consensus":consensus,"quantify":quantify_features,"aggregates":aggregates,
+                 "chromosight_discovery":lambda c,s:__import__("microc2compare.fine_loops",fromlist=["chromosight_discovery"]).chromosight_discovery(c,s),
+                 "stripes":lambda c,s:__import__("microc2compare.stripes",fromlist=["stripes"]).stripes(c,s),
+                 "stripe_consensus":lambda c,s:__import__("microc2compare.stripes",fromlist=["stripes_summary"]).stripes_summary(c),
+                 "browser_export":lambda c,s:__import__("microc2compare.browser_export",fromlist=["export_browser"]).export_browser(c,s),
+                 "chromosight":lambda c,s:__import__("microc2compare.fine_loops",fromlist=["chromosight_scores"]).chromosight_scores(c,s),
+                 "annotation":lambda c,s:__import__("microc2compare.annotation",fromlist=["run"]).run(c,s),
                  "differential":differential,"depth_sensitivity":depth_sensitivity,"hicrep":hicrep}

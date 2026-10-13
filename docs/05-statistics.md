@@ -2,7 +2,9 @@
 
 The report's [differential loop volcano plots](22-loop-volcano-plots.md) show model log2 allocation effects against biological P values, with colours determined by full-family BH FDR. They never substitute caller enrichment statistics for biological evidence. Descriptive comparisons have no volcano; preliminary/development limitations remain labelled. Optional magnitude and label settings change display only.
 
-One manifest row is one biological unit/condition observation. Technical libraries, lanes, pools and thinning seeds are never independent replicates. Distinct IDs alone do not prove independence. Register actual experimental units and deduplication history before interpreting any contrast.
+One manifest row is one biological observation in one condition. Technical libraries, lanes, pools and thinning seeds are never independent replicates. Distinct IDs alone do not prove independence. Register actual experimental units and deduplication history before interpreting any contrast.
+
+Independently grown cultures from a shared donor may have separate explicit `experimental_unit_id` or `culture_id` values for descriptive analyses; their shared `subject_id` stays unchanged. The formal/preliminary minimum counts distinct subjects per condition, and additional cultures from one subject do not increase that count. A formal/preliminary contrast containing multiple culture observations for one subject within a condition is rejected even if it has enough distinct subjects, because the current R models do not support the required nested donor/culture structure. An additive culture covariate cannot bypass this gate. One observation per subject per condition continues to support the existing paired subject design.
 
 ## Eligible comparisons
 

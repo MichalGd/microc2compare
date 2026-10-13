@@ -144,6 +144,16 @@ def test_stale_sheet_reference_and_matrix_assembly_are_flagged(upstream):
     assert any("assembly metadata" in issue for issue in unit["errors"])
 
 
+def test_unknown_assembly_is_reviewable_missing_metadata_not_wrong_genome(upstream):
+    root,sheet,_,_,single,_=upstream
+    with h5py.File(single,'r+') as handle:
+        for resolution in (10000,100000):handle[f'resolutions/{resolution}'].attrs['genome-assembly']='unknown'
+    unit=next(unit for unit in discover(sheet,root)['units'] if unit['sample_id']=='C2')
+    assert unit['status']=='needs_review'
+    assert not any('assembly metadata differs' in issue for issue in unit['errors'])
+    assert any('missing/unknown' in issue for issue in unit['review_required'])
+
+
 def test_drafts_preserve_gaps_and_refuse_overwriting(upstream, tmp_path):
     root, sheet, _, merged, single, _ = upstream
     hashes = [file_hash(merged), file_hash(single)]
@@ -201,6 +211,95 @@ def test_legacy_reference_requires_explicit_evidence(upstream):
     assert all(unit["status"] == "blocked" and not unit["reference_id"] for unit in discover(sheet, root)["units"])
     assert all(unit["reference_id"] == "mm39" and unit["status"] == "needs_review"
                for unit in discover(sheet, root, legacy_reference_id="mouse")["units"])
+
+
+def legacy_metadata(root, rows, reference=None, missing_sample=None):
+    records = [{**row, "biological_replicate": "1", "technical_replicate": str(i + 1),
+                "merge_group": "old_all_sources"}
+               for i, row in enumerate(rows) if row["sample"] != missing_sample]
+    fields = ("sample", "assay", "condition", "biological_replicate", "technical_replicate", "merge_group")
+    if reference:
+        fields += ("reference_id",)
+        for row in records:
+            row["reference_id"] = reference
+    write_table(root / "run_metadata/sample_manifest.tsv", records, fields)
+    with (root / "run_metadata/technical_replicates.tsv").open("w", encoding="utf-8", newline="") as handle:
+        for row in records:
+            handle.write(f"old_all_sources\t{row['sample']}\t/data/{row['sample']}.valid.mapq30.pairs.gz\n")
+    (root / "run_metadata/merge_manifest.tsv").unlink()
+
+
+def test_legacy_headerless_basal_individuals_preserve_grouping_and_missing_provenance(upstream, tmp_path):
+    root, sheet, rows, _, _, _ = upstream
+    for i, row in enumerate(rows):
+        row.pop("reference_genome")
+        row.update(biological_replicate=str(i + 1), technical_replicate="1", merge_group=f"new_B{i + 1}")
+        if not (root / row["sample"] / "04_matrices" / f"{row['sample']}.norm.mcool").exists():
+            matrix(root / row["sample"] / "04_matrices" / f"{row['sample']}.norm.mcool")
+    write_sheet(sheet, rows)
+    legacy_metadata(root, rows, missing_sample="C1_B")
+    before = {str(path): file_hash(path) for path in root.rglob("*") if path.is_file()}
+    report = discover(sheet, root, legacy_reference_id="mm39", individual_matrices=True)
+    assert len(report["units"]) == 3 and report["individual_matrices"]
+    assert all(unit["selection"] == "individual" and unit["status"] == "needs_review" for unit in report["units"])
+    assert all("/merged/" not in unit["matrix_path"].replace("\\", "/") for unit in report["units"])
+    by_id = {unit["sample_id"]: unit for unit in report["units"]}
+    assert any("absent from" in issue for issue in by_id["C1_B"]["review_required"])
+    assert any("biological_replicate" in issue for issue in by_id["C2"]["review_required"])
+    assert by_id["C2"]["recorded_upstream_metadata"][0]["biological_replicate"] == "1"
+    assert by_id["C2"]["biological_replicate"] == "3"
+    assert by_id["C2"]["recorded_technical_membership"][0]["pairs_path"].endswith("C2.valid.mapq30.pairs.gz")
+    output = write_drafts(report, tmp_path / "legacy-drafts")
+    evidence = json.loads((output / "provenance/C2.json").read_text())["handoff_evidence"]
+    assert evidence["individual_matrices"] and evidence["recorded_upstream_metadata"][0]["merge_group"] == "old_all_sources"
+    assert evidence["review_required"]
+    assert before == {str(path): file_hash(path) for path in root.rglob("*") if path.is_file()}
+    command = [sys.executable, str(Path(__file__).resolve().parents[1] / "scripts/prepare_microc2compare_inputs.py"),
+               "--samplesheet", str(sheet), "--upstream-results", str(root), "--legacy-reference-id", "mm39",
+               "--individual-matrices", "--json"]
+    completed = subprocess.run(command, capture_output=True, text=True)
+    assert completed.returncode == 0, completed.stderr
+    assert len(json.loads(completed.stdout)["units"]) == 3
+
+
+def test_legacy_group_conflicts_remain_blocking_without_individual_opt_in(upstream):
+    root, sheet, rows, *_ = upstream
+    legacy_metadata(root, rows)
+    report = discover(sheet, root, legacy_reference_id="mm39")
+    assert any(unit["status"] == "blocked" and any("membership differs" in error for error in unit["errors"])
+               for unit in report["units"])
+
+
+def test_legacy_reference_missing_does_not_become_verified(upstream):
+    root, sheet, rows, *_ = upstream
+    legacy_metadata(root, rows)
+    for row in rows:
+        row.pop("reference_genome")
+    write_sheet(sheet, rows)
+    assert all(unit["status"] == "blocked" and not unit["reference_id"] for unit in discover(sheet, root)["units"])
+
+
+def test_individual_opt_in_does_not_split_multi_source_biological_units(upstream):
+    root, sheet, *_ = upstream
+    with pytest.raises(ContractError, match="exactly one sheet source"):
+        discover(sheet, root, individual_matrices=True)
+
+
+def test_individual_opt_in_preserves_known_reference_mismatch(upstream):
+    root, sheet, rows, *_ = upstream
+    write_sheet(sheet, rows[-1:])
+    legacy_metadata(root, rows, reference="hg38")
+    unit = discover(sheet, root, legacy_reference_id="mm39", individual_matrices=True)["units"][0]
+    assert unit["status"] == "blocked"
+    assert any("reference differs" in issue for issue in unit["errors"])
+
+
+@pytest.mark.parametrize("contents", ["group\tsample\n", "group\tsample\tnot_pairs.tsv\n", "group\tsample\tx.pairs.gz\textra\n"])
+def test_malformed_legacy_technical_membership_is_not_ignored(upstream, contents):
+    root, sheet, *_ = upstream
+    (root / "run_metadata/technical_replicates.tsv").write_text(contents)
+    with pytest.raises(ContractError):
+        discover(sheet, root)
 
 
 def test_other_run_manifest_path_is_not_selected(upstream, tmp_path):

@@ -42,6 +42,14 @@ def main():
         return
     print(f"Run: {c['run_dir']}\nImported matrices: read-only counts + stored weights")
     print("Analysis selection: " + ",".join(c.get("_requested_analyses", ["configured full pipeline"])))
+    print("Chromosome scope: "+c['CHROMOSOME_SCOPE']+(' '+c['SEX_CHROMOSOMES'] if c['SEX_CHROMOSOMES'] else ''))
+    from microc2compare.resolutions import loop_resolutions, quantification_resolutions, chromosight_discovery_resolutions
+    from microc2compare.analyses import has_loop_discovery, needs_loop_counts
+    if c['RUN_LOOPS']:print('Loop discovery: '+c['LOOP_CALLER']+'; grids '+','.join(map(str,loop_resolutions(c)))+' bp')
+    if c['RUN_CHROMOSIGHT_DISCOVERY']:print('Independent CPU loop discovery: chromosight; grids '+','.join(map(str,chromosight_discovery_resolutions(c)))+' bp')
+    if has_loop_discovery(c) or needs_loop_counts(c):print('Loop measurements: '+','.join(map(str,quantification_resolutions(c)))+' bp')
+    if c['RUN_STRIPES']:print('Stripe discovery: StripePy CPU; grids '+c['STRIPE_RESOLUTIONS']+' bp; common eligible segments')
+    if c['RUN_BROWSER_EXPORT']:print('Browser exports: '+','.join(name for key,name in [('EXPORT_UCSC','UCSC'),('EXPORT_HIGLASS','HiGlass conversion')] if c[key]))
     if c["RUN_AGGREGATES"]: print("Aggregate modules: " + c["AGGREGATE_MODULES"])
     for i, stage in enumerate(STAGES, 1):
         mode = "enabled" if enabled(c, stage) else "skipped_config"

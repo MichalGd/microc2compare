@@ -138,87 +138,25 @@ Choose one publication location according to site policy; do not replace existin
 
 ## 3. Start as an ordinary server user
 
-After the maintainer activates the profile-bound 0.2.5 command, ordinary analysis requires your private project configuration:
+Use your existing Bash login and the profile-bound shared command. For a new project:
 
 ```bash
-microc2compare -c /path/to/your/project.conf --dry-run
-microc2compare -c /path/to/your/project.conf
-microc2compare -c /path/to/your/project.conf --analysis tads
+microc2compare --init "$HOME/my_microc_project/config/project.conf"
 ```
 
-Set `OUTDIR` and `SCRATCH_ROOT` to directories you own. No manual software-profile line is needed in the shell or project file. The optional workspace/cache setup below remains useful; its manual profile exports are needed for the separate upstream/demo/bootstrap helpers and older unbound commands, not for routine analysis through the new launcher.
-
-**Each user, in a new login under their own account:** use the actual release/profile locations announced by the maintainer. The values below match this guide's example layout.
-
-Run the shell command separately and wait for its prompt:
+Edit only experiment-specific inputs, genome, outputs/scratch, run identity and CPU/RAM budget. For a completed project:
 
 ```bash
-bash --noprofile --norc
+microc2compare -c /your/project/config/project.conf --dry-run
+microc2compare -c /your/project/config/project.conf --analysis qc,hicrep
+microc2compare -c /your/project/config/project.conf --validate
 ```
 
-Run this block from your own account. `$HOME` selects your home directory automatically:
-
-```bash
-set -Eeuo pipefail
-unset HISTFILE BASH_ENV ENV PYTHONHOME PYTHONPATH R_HOME R_LIBS R_LIBS_USER
-m2c_base="/opt/conda_envs/microc2compare"
-m2c_src="/opt/conda_envs/microc2compare/releases/shared-design-json-fix-20261008/microc2compare-0.1.0"
-m2c_site="/opt/conda_envs/microc2compare/site/shared-design-json-fix-20261008.conf"
-source "$m2c_site"
-umask 077
-m2c_work="$HOME/microc2compare-work"
-mkdir -p "$m2c_work/projects" "$m2c_work/validation" "$m2c_work/audit" \
-  "$m2c_work/tmp" "$m2c_work/cache/conda-pkgs" \
-  "$m2c_work/runtime-config" "$m2c_work/runtime-data" \
-  "$m2c_work/cache/matplotlib" "$m2c_work/cache/pip"
-export TMPDIR="$m2c_work/tmp"
-export CONDA_PKGS_DIRS="$m2c_work/cache/conda-pkgs"
-export CONDA_ENVS_PATH="$m2c_base/envs"
-export CONDA_REGISTER_ENVS=false
-export CONDA_ALWAYS_COPY=true
-export XDG_CACHE_HOME="$m2c_work/cache"
-export XDG_CONFIG_HOME="$m2c_work/runtime-config"
-export XDG_DATA_HOME="$m2c_work/runtime-data"
-export MPLCONFIGDIR="$m2c_work/cache/matplotlib"
-export PIP_CACHE_DIR="$m2c_work/cache/pip"
-export PYTHONDONTWRITEBYTECODE=1
-export PYTHONNOUSERSITE=1
-/opt/conda_envs/microc2compare/bin/microc2compare-0.1.0-shared-design-json-fix-20261008 --help
-```
-
-Use a dedicated terminal for these session-only exports. Do not put them in `.bashrc` or run `conda init`/`conda config --set`; exit this terminal when finished. These variables select already installed software. This does not install packages, activate an environment globally or require a fresh copy of the source. A writable user temp directory is needed for configuration probes and Conda's command wrappers; see [Conda temporary-file guidance](https://docs.conda.io/projects/conda/en/latest/user-guide/configuration/temp-files.html). Record the actual Conda version and test it under the non-maintainer account; a historical version that tries to write inside its prefix is not accepted merely because it works for the owner. Fix that through a reviewed site installation, without granting ordinary users prefix-write access.
-
-For a real project, export input drafts into a fresh directory in **your** workspace:
-
-```bash
-"$CONDA_EXE" run --no-capture-output -p "$CORE_ENV_PREFIX" \
-  python "$m2c_src/scripts/prepare_microc2compare_inputs.py" \
-  --samplesheet /ACTUAL/UPSTREAM/samplesheet.csv \
-  --upstream-results /ACTUAL/UPSTREAM/results \
-  --project my_project --reference-id mm39 \
-  --write-drafts "$m2c_work/projects/my_project/config"
-cp "$m2c_src/config/config_template.conf" \
-  "$m2c_work/projects/my_project/config/project.conf"
-printf '\nsource "%s"\n' "$m2c_site" >> \
-  "$m2c_work/projects/my_project/config/project.conf"
-```
-
-Replace upstream paths/reference first and choose a new project destination if it exists. Read `READ_BEFORE_RUNNING.md` and [the handoff instructions](13-upstream-handoff.md). Edit the copied project configuration to match the actual draft filenames, reference registrations, biological tables, `PROJECT`/analysis/run IDs, relative `OUTDIR="../results"` and `SCRATCH_ROOT="../scratch"`. Source an appropriate resource preset **before** measured overrides. Keep optional pool/thinning/balancing disabled. Start with explicit descriptive comparisons; a profile with no differential R prefix does not support formal inference. Never edit files under the shared source tree for an analysis.
-
-Run from any working directory using your private configuration:
-
-```bash
-m2c_project_conf="$m2c_work/projects/my_project/config/project.conf"
-bash "$m2c_src/scripts/bootstrap_environments.sh" -c "$m2c_project_conf" --check-only
-bash "$m2c_src/scripts/preflight_check.sh" -c "$m2c_project_conf"
-/opt/conda_envs/microc2compare/bin/microc2compare-0.1.0-shared-design-json-fix-20261008 \
-  -c "$m2c_project_conf" --dry-run
-/opt/conda_envs/microc2compare/bin/microc2compare-0.1.0-shared-design-json-fix-20261008 -c "$m2c_project_conf"
-```
+No manual `source`, Conda activation, software-prefix/source path, cache/temp exports or separate clean shell is required. The runner sets private permissions and places runtime caches under your chosen `SCRATCH_ROOT/.runtime`. Each user chooses directories they own; shared code and environments remain outside users' home directories. Preparation and reference/annotation registration use the same shared command: [simple project guide](32-simple-project-commands.md). Existing completed inputs need no reimport. Follow [0.3.2 candidate acceptance](33-simple-project-upgrade.md) before making its convenience commands available.
 
 ## 4. Accept the installation from a second account
 
-**An ordinary account, not the installation maintainer or root:** complete step 3's software/workspace setup, then check access. Run this before real projects and preserve the audit log. `namei -l` or `getfacl` can help the maintainer diagnose parent/ACL restrictions if installed.
+**Maintainer-coordinated access acceptance under an ordinary account:** the older fixture commands below are historical installation checks, not routine researcher setup. Use the release/profile/prefix variables from the maintainer installation steps above; source the chosen profile only for these unbound inspection helpers. Prefer the current [0.3.2 acceptance procedure](33-simple-project-upgrade.md) for new deployments. Run this before real projects and preserve the audit log. `namei -l` or `getfacl` can help the maintainer diagnose parent/ACL restrictions if installed.
 
 ```bash
 test -r "$m2c_src/README.md"

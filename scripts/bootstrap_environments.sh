@@ -12,8 +12,13 @@ trap 'rm -f -- "$CONFIG_JSON"' EXIT
 required_text=$("$PYTHON_BOOTSTRAP" "$(python_path "$M2C_ROOT/scripts/environment_probe.py")" required --config "$CONFIG_JSON")
 mapfile -t required <<< "$required_text"
 for kind in "${required[@]}"; do
-  case "$kind" in core) key=CORE_ENV_PREFIX; lockkey=CORE_LOCK; definition="$M2C_ROOT/environment.yml";; hicrep) key=HICREP_ENV_PREFIX; lockkey=HICREP_LOCK; definition="$M2C_ROOT/envs/hicrep.yml";; diff_r) key=DIFF_R_ENV_PREFIX; lockkey=DIFF_R_LOCK; definition="$M2C_ROOT/envs/diff-r.yml";; esac
+  case "$kind" in core) key=CORE_ENV_PREFIX; lockkey=CORE_LOCK; definition="$M2C_ROOT/environment.yml";; loops) key=LOOP_ENV_PREFIX; lockkey=LOOP_LOCK; definition="$M2C_ROOT/envs/fine-loops.yml";; browser) key=BROWSER_ENV_PREFIX; lockkey=BROWSER_LOCK; definition="$M2C_ROOT/envs/browser.yml";; stripes) key=STRIPE_ENV_PREFIX; lockkey=STRIPE_LOCK; definition="$M2C_ROOT/envs/stripes.yml";; hicrep) key=HICREP_ENV_PREFIX; lockkey=HICREP_LOCK; definition="$M2C_ROOT/envs/hicrep.yml";; diff_r) key=DIFF_R_ENV_PREFIX; lockkey=DIFF_R_LOCK; definition="$M2C_ROOT/envs/diff-r.yml";; esac
   prefix=$(config_get "$key")
+  [[ "$kind" != stripes || -n "$prefix" ]] || die "Set a NEW STRIPE_ENV_PREFIX; the core environment will not be changed"
+  if [[ "$kind" == loops && -z "$prefix" ]]; then
+    [[ "$action" == --check-only ]] || die "Set a NEW LOOP_ENV_PREFIX before --create-missing; the core will not be changed"
+    prefix=$(config_get CORE_ENV_PREFIX)
+  fi
   if [[ "$(config_get ENVIRONMENT_MODE)" != development && ! -d "$prefix/conda-meta" ]]; then
     [[ "$action" == --create-missing ]] || die "Missing $kind prefix $prefix; set an owned path and run explicit --create-missing"
     [[ ! -e "$prefix" ]] || die "Refusing to install over an existing non-Conda directory: $prefix"
@@ -21,9 +26,9 @@ for kind in "${required[@]}"; do
     if [[ -n "$lock" ]]; then
       [[ -f "$lock" ]] || die "Configured lock missing: $lock"
       "$CONDA_EXE" create -y -p "$prefix" --file "$lock"
-      if [[ "$kind" == hicrep ]]; then
-        [[ -f "$lock.pip.txt" ]] || die "Exact HiCRep reconstruction needs a reviewed $lock.pip.txt with hashed pip requirements"
-        env_run hicrep python -m pip install --require-hashes --no-deps -r "$lock.pip.txt"
+      if [[ "$kind" == hicrep || "$kind" == loops || "$kind" == stripes || "$kind" == browser ]]; then
+        [[ -f "$lock.pip.txt" ]] || die "Exact $kind reconstruction needs a reviewed $lock.pip.txt with hashed pip requirements"
+        env_run "$kind" python -m pip install --require-hashes --no-deps -r "$lock.pip.txt"
       fi
     else
       [[ "$(config_get ENVIRONMENT_MODE)" != locked ]] || die "Locked mode requires an exact tested lock; no unpinned fallback"

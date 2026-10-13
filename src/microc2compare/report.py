@@ -56,16 +56,9 @@ def render(c,scope):
             fig,ax=plt.subplots(figsize=(6,5));im=ax.imshow(matrix,vmin=-1,vmax=1,cmap="coolwarm")
             ax.set_xticks(range(len(ids)),ids,rotation=90);ax.set_yticks(range(len(ids)),ids);fig.colorbar(im,ax=ax,label="HiCRep SCC")
             fig.tight_layout();path=figures/"hicrep.png";fig.savefig(path,dpi=150);plt.close(fig);outputs.append(path);plots.append(("Replicate concordance",path))
-    for module in ("apa","ada","saddle"):
-        if module not in aggregate_modules(c):continue
-        if module=="saddle" and not c["RUN_COMPARTMENTS"]:continue
-        for path in (root/"05_aggregates"/module).glob("*.npz"):
-            if path.stem not in {s["sample_id"] for s in samples}:continue
-            data=np.load(path)["mean"]
-            if not np.isfinite(data).any():continue
-            fig,ax=plt.subplots(figsize=(4,4));im=ax.imshow(data,cmap="coolwarm",vmin=0,vmax=float(np.nanpercentile(data,95)))
-            ax.set_title(f"{module.upper()} {path.stem}");fig.colorbar(im,ax=ax,label="Observed/expected");fig.tight_layout()
-            picture=figures/(module+"."+path.stem+".png");fig.savefig(picture,dpi=150);plt.close(fig);outputs.append(picture);plots.append((module.upper(),picture))
+    from .fine_report import render as render_fine
+    products,pictures,fine_sections=render_fine(c,samples,metadata)
+    outputs.extend(products);plots.extend(pictures)
     # One bounded representative locus per replicate; read original counts/weights.
     if enabled(c,"tads"):
         tad_record=root/"completion/run/tads.done.json"
@@ -117,17 +110,23 @@ def render(c,scope):
             fig.tight_layout();path=figures/("locus."+sample["sample_id"]+".png");fig.savefig(path,dpi=150);plt.close(fig);outputs.append(path);plots.append(("Representative locus",path))
     validation="uncalibrated" if c["ALLOW_UNCALIBRATED_DEVELOPMENT"] else "software_run; consult per-comparison calibration status"
     normalization="inherited_upstream_weights" if any(c[k] for k in ("RUN_QC","RUN_COMPARTMENTS","RUN_INSULATION","RUN_LOOPS","RUN_AGGREGATES")) else "raw_counts_only"
+    coordinate_scopes=[read_json(path) for path in sorted((root/"00_metadata/masks").glob("*.scope.json"))]
     summary_path=directory/"run_summary.json"
-    atomic_json(summary_path,{"project":c["PROJECT"],"run_id":c["RUN_ID"],"validation_status":validation,"stages":statuses,"normalization":normalization,"production_readiness":"requires calibration, real-data and server pilot validation"})
+    atomic_json(summary_path,{"project":c["PROJECT"],"run_id":c["RUN_ID"],"validation_status":validation,"stages":statuses,"normalization":normalization,"coordinate_scopes":coordinate_scopes,"production_readiness":"requires calibration, real-data and server pilot validation"})
     outputs.append(summary_path)
     methods=directory/"methods.md"
     methods.write_text("# Methods\n\nImported raw counts and existing upstream weights are read without copying/rebalancing. Expected tables use the common eligible-pixel denominator, including observable zeros. Pools and thinning are optional descriptive products.\n\nFormal loops use independent frozen single-pixel candidates, global eligible-cis exposures and edgeR robust quasi-likelihood with normalization factors one. Insulation uses the fixed primary grid with direct limma empirical-Bayes models; boundary/domain/compartment summaries remain descriptive. Biological FDR families are separate from caller enrichment significance.\n\n[Cooler](https://cooler.readthedocs.io/en/latest/api.html), [cooltools](https://cooltools.readthedocs.io/), [HiCRep](https://github.com/dejunlin/hicrep), [edgeR](https://bioconductor.org/packages/edgeR/), [limma](https://bioconductor.org/packages/limma/).\n",encoding="utf-8")
     outputs.append(methods)
+    if coordinate_scopes:
+        with methods.open("a",encoding="utf-8") as handle:
+            handle.write("\nAnalysis chromosomes: "+", ".join(coordinate_scopes[0]["analysis_chromosomes"])+". Exact registered bin coordinates and the intersection of usable bins are shared across biological observations. Stored weights are not recalculated. Common coordinates do not equalize upstream balancing scopes. QC native contact totals can include excluded chromosomes; eligible exposures and distance decay use only the common registered views. X/Y are retained when requested and available, with sparse or masked measurements unavailable rather than zero. Interpret sex-chromosome comparisons with sample sex/copy number and coverage.\n")
     esc=html.escape
     sections=[f"<h1>microc2compare — {esc(c['PROJECT'])}</h1><p>Run {esc(c['RUN_ID'])}; {esc(validation)}.</p>",
               "<p>Existing raw counts were read directly. Enabled balanced analyses reuse validated stored weights. Descriptive results carry no biological P values. Caller significance and differential FDR have different meanings.</p>","<h2>Stage status</h2>",pd.DataFrame(statuses).to_html(index=False,escape=True),"<h2>Biological samples</h2>",pd.DataFrame(samples)[["sample_id","condition","assay","subject_id"]].to_html(index=False,escape=True),"<h2>Figures</h2>"]
     sections.insert(-1,"<h2>Analysis settings</h2><p>Requested analyses: "+esc(", ".join(c.get("_requested_analyses",["configured full pipeline"])))+".</p><details><summary>Configuration snapshot, paths and parameter values</summary>"+pd.DataFrame([{"setting":k,"value":str(v)} for k,v in sorted(c.items())]).to_html(index=False,escape=True)+"</details>")
     identities=read_json(root/"00_metadata/inputs.json")
+    if coordinate_scopes:
+        sections.insert(-1,"<h2>Chromosome scope and inherited weights</h2><p>Analysis chromosomes: "+esc(", ".join(coordinate_scopes[0]["analysis_chromosomes"]))+". Matching coordinates and common usable bins are verified. Unselected sequences are excluded from comparisons without modifying the input maps.</p><p>Stored weights retain their upstream balancing scope. Selecting common chromosomes does not make those scopes identical. Native QC totals describe the entire input map; eligible exposures and distance decay describe the common views. For X/Y, review sample sex, copy number and coverage. Missing or masked measurements are not zeros.</p><details><summary>Per-resolution and per-sample chromosome scope</summary><pre>"+esc(json.dumps(coordinate_scopes,indent=2))+"</pre></details>")
     sections.insert(-1,"<details><summary>Registered input files and SHA256 identities</summary>"+pd.DataFrame(list(identities.values())).to_html(index=False,escape=True)+"</details>")
     if enabled(c,"tads"):
         sections.insert(-1,"<h2>TAD changes</h2><p>Domains are intervals between strong insulation boundaries. Growing/shrinking refers to length in base pairs. Event groups are descriptive; coverage failures and replicate disagreement are uncertain, not biological disappearance. Merge/split members are counted once per event group. No event-level biological P values or FDR are available. Mean log2 insulation and boundary prominence are distinct from intra-domain contact enrichment.</p>")
@@ -141,6 +140,7 @@ def render(c,scope):
         for entry in volcano_statuses:
             sections.insert(-1,"<p><strong>"+esc(entry["comparison_id"])+"</strong>: "+esc(entry["reason"])+"</p>")
         sections.insert(-1,pd.DataFrame(volcano_statuses).to_html(index=False,escape=True))
+    sections.extend(fine_sections)
     for title,path in plots:sections.append(f'<figure><figcaption>{esc(title)}</figcaption><img loading="lazy" src="{esc(str(path.relative_to(directory)).replace(chr(92),chr(47)))}" width="650"></figure>')
     sections.append("<h2>Download results</h2><ul>")
     current={p.resolve() for p in outputs}
@@ -153,7 +153,7 @@ def render(c,scope):
             current.update((root/entry["path"]).resolve() for entry in record["outputs"] if not entry.get("discarded_intermediate"))
     for path in sorted(root.rglob("*")):
         if path.resolve() not in current:continue
-        if not path.is_file() or path.suffix not in (".tsv",".json",".bed",".bedgraph",".npz",".md",".png",".svg"):continue
+        if not path.is_file() or path.suffix not in (".tsv",".json",".bed",".bedpe",".bedgraph",".npz",".md",".png",".svg"):continue
         if any(x in path.parts for x in ("completion","logs",".run-lock")):continue
         relative=Path("..")/path.relative_to(root)
         purpose=output_purpose(path.relative_to(root))
@@ -181,6 +181,8 @@ def output_purpose(path):
     if "03_features/compartments" in name: return "Compartment vectors, eigenvalues or orientation QC"
     if "03_features/insulation" in name: return "Fixed-grid insulation, boundary strength and coverage"
     if "03_features/loops" in name: return "Loop discovery/consensus; caller significance is not differential FDR"
+    if "03_features/stripes" in name: return "Stripe geometry, native caller descriptors and common-segment coverage; descriptive support only"
+    if "browser_tracks" in name: return "UCSC tracks and optional HiGlass exports; see inventory for format and conversion status"
     if "04_quantification" in name: return "Raw feature counts, exposures, exclusions or domain O/E measurements"
     if "05_aggregates" in name: return "Per-replicate observed/expected aggregates and contribution counts"
     if "06_comparisons" in name: return "Comparison inputs, parameters or effects; inspect inference/validation status"

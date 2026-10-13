@@ -1,0 +1,50 @@
+name: optional-browser-converters
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pinned-local-conversion:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CONDA_PKGS_DIRS: ${{ runner.temp }}/browser-conda-pkgs
+      M2C_REQUIRE_BROWSER_CONVERTERS: "1"
+      M2C_BROWSER_ACCEPTANCE_DIR: ${{ runner.temp }}/browser-acceptance
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          auto-activate: true
+          activate-environment: ""
+          channels: conda-forge,bioconda
+          channel-priority: strict
+      - name: Cache version-bound package downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/browser-conda-pkgs
+          key: browser-linux-${{ runner.arch }}-${{ hashFiles('envs/browser.yml') }}
+      - name: Create optional conversion prefix
+        run: |
+          conda env create -p "$RUNNER_TEMP/m2c-browser" -f envs/browser.yml
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-browser" python -m pip install pytest==8.3.5
+          mkdir -p "$M2C_BROWSER_ACCEPTANCE_DIR"
+          conda list -p "$RUNNER_TEMP/m2c-browser" --json > "$M2C_BROWSER_ACCEPTANCE_DIR/package_inventory.json"
+      - name: Actual converter probe and source-coordinate acceptance
+        run: |
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-browser" python -m pytest -q \
+            tests/test_browser_converters_actual.py tests/test_browser_runtime.py \
+            tests/test_browser_export.py tests/test_browser_pipeline.py tests/test_parallel_scheduler.py
+      - name: Retain conversion and coordinate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: optional-browser-conversion-acceptance
+          path: ${{ runner.temp }}/browser-acceptance
+          if-no-files-found: ignore

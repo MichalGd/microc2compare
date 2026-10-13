@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "microc2compare"
-version = "0.2.5"
+version = "0.4.0"
 description = "Shell-coordinated replicate-aware comparisons of existing Micro-C/Hi-C matrices"
 requires-python = ">=3.11"
 dependencies = []

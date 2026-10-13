@@ -9,7 +9,7 @@ DETAILS={
 'VOLCANO_MIN_ABS_LOG2_EFFECT':'Nonnegative effect magnitude for highlighting only; does not filter points, change tests, or recompute BH FDR.',
 'VOLCANO_LABEL_TOP_N':'Label up to this many highlighted loops by model P value; 0 disables labels, maximum 20. All usable tested points remain plotted.',
 'RUN_TADS':'Insulation-defined per-replicate/condition domains and descriptive event comparisons; active with insulation.',
-'AGGREGATE_MODULES':'Comma-separated apa,ada,saddle selection; only chosen aggregate consumers run.',
+'AGGREGATE_MODULES':'Comma-separated apa,ada,saddle selection; saddle is required by full practical_2_4kb/hsieh_inspired profiles. Explicit --analysis selections run their chosen consumers.',
 'INSULATION_BOUNDARY_THRESHOLD':'Li (existing default), Otsu, or a finite nonnegative fixed prominence threshold; numbers use cooltools strength units.',
 'TAD_MIN_LENGTH_BP':'Minimum boundary-to-boundary domain length in bp; descriptive policy.',
 'TAD_MAX_LENGTH_BP':'Maximum boundary-to-boundary domain length in bp; descriptive policy.',
@@ -58,7 +58,7 @@ DETAILS={
 'RUN_LOOPS':'Dots discovery at the primary and approved sensitivity grid.',
 'RUN_AGGREGATES':'Per-replicate APA/ADA/saddles using enabled feature consumers.',
 'RUN_DIFFERENTIAL':'Explicit comparison adapters; formal requests retain all statistical gates.',
-'RUN_FINAL_REPORT':'Standalone HTML, plots, methods and downloadable outputs.',
+'RUN_FINAL_REPORT':'Standalone HTML, plots, methods and downloadable outputs; required for full practical_2_4kb/hsieh_inspired profiles, including replicate/condition saddle plots.',
 'KEEP_POOLED_MAPS':'Retain newly created pool maps after consumers; imported pools always stay untouched.',
 'KEEP_DOWNSAMPLED_MAPS':'Retain explicitly generated sensitivity maps instead of releasing after each seed.',
 'CLEAN_SCRATCH_ON_SUCCESS':'Remove only the successful task-owned scratch directory.',
@@ -96,7 +96,7 @@ DETAILS={
 'LEGACY_WEIGHT_VALIDATION':'reject missing convergence, or explicit finite_positive exception with evidence gap.',
 'SADDLE_PARTITION_SOURCE':'replicate_rank_mean, external registered track, or validated all_sample_pool.',
 'SADDLE_REFERENCE_TRACK':'Exact-grid external bedGraph for the explicit external partition mode.',
-'MIN_PHASING_CORRELATION':'Minimum absolute component/track correlation for orientation.',
+'MIN_PHASING_CORRELATION':'Minimum absolute component/track correlation for orientation. A registered common phasing track is required for compartments and saddles; ambiguous views remain missing.',
 'MAX_DENSE_BINS':'Bound on dense regional arrays; compartment memory estimate also applies.',
 'PIXEL_CHUNKSIZE':'Raw pixel streaming/merge chunk size; tune with measured memory/I/O.',
 'MIN_FREE_DISK_MB':'Minimum free-space floor near outputs/scratch; optional derived capacity needs pilot budgeting.',
@@ -107,6 +107,67 @@ DETAILS={
 'MAX_PARALLEL_MATRIX':'Cap on simultaneous matrix-heavy tasks.',
 'MAX_PARALLEL_IO':'Cap on simultaneous registration/pool/thinning I/O-heavy tasks.'}
 
+DETAILS.update({
+'CHROMOSOME_SCOPE':'autosomes (default), autosomes_plus_sex, or explicit. Effective coordinates are frozen; changing them requires a new RUN_ID.',
+'SEX_CHROMOSOMES':'Exact comma-separated registered sex chromosomes, e.g. chrX or chrX,chrY; empty by default.',
+'ANALYSIS_CHROMOSOMES':'Exact chromosome names for explicit subset scope; empty for other policies.',
+'ANALYSIS_PROFILE':'existing, practical_2_4kb, or hsieh_inspired. Full fine-loop profiles require compartments, saddle and a final report; explicit module selections remain independent. hsieh_inspired requires primary-source method metadata; none claims exact historical reproduction.',
+'MATRIX_REGISTRY':'Optional resolution-specific map path overrides, preserving one biological observation per manifest row.',
+'RESOLUTION_ELIGIBILITY_REGISTRY':'Reviewed current metadata/retention/reproducibility evidence required for 1-kb/sub-kb loop analysis.',
+'HSIEH_METHODS_REGISTRY':'Primary-source verified parameters, source locations and explicit differences from the publication.',
+'ALLOW_SUBKILOBASE_ANALYSIS':'Explicit optional sub-kb permission; does not replace eligibility review or statistical calibration.',
+'LOOP_DISCOVERY_RESOLUTIONS':'Comma-separated discovery grids; empty uses primary plus legacy sensitivity grids.',
+'LOOP_QUANTIFICATION_RESOLUTIONS':'Comma-separated complete count/scoring/APA/comparison grids; empty uses primary.',
+'LOOP_ENV_PREFIX':'Optional separately checked Mustache/Chromosight prefix; empty checks the core for required tools without updating it.',
+'LOOP_LOCK':'Optional exact caller-prefix Conda lock plus reviewed pip requirements/inventory.',
+'MUSTACHE_P_THRESHOLD':'Mustache enrichment significance threshold. Caller significance is not biological differential FDR.',
+'MUSTACHE_SPARSITY_THRESHOLD':'Pinned Mustache local sparsity threshold; practical default 0.88, not a verified historical Hsieh setting.',
+'MUSTACHE_SIGMA_ZERO':'Starting Gaussian scale in bins; pinned practical default 1.6.',
+'MUSTACHE_OCTAVES':'Number of increasing Gaussian scale octaves; positive integer.',
+'MUSTACHE_ITERATIONS':'Pinned 1.3.3 library hardcodes ten scale iterations; other values fail.',
+'CROSS_RESOLUTION_TOLERANCE_BINS':'Complete-linkage anchor matching tolerance measured on the coarser grid; original calls and aliases retained.',
+'RUN_CHROMOSIGHT':'Measure the fixed-candidate kernel correlation in every biological replicate; descriptive scores only.',
+'CHROMOSIGHT_MAX_MISSING_FRACTION':'Maximum missing fraction within the kernel window; failing windows remain NA with a reason.',
+'RUN_ANNOTATION':'Optional both-anchor gene/cCRE annotation, preserving ambiguous overlaps.',
+'ANNOTATION_REGISTRY':'GTF/cCRE paths, SHA256 identities, reference/source releases and any assembly-conversion history.',
+'ANNOTATION_PROMOTER_UPSTREAM':'Strand-aware promoter extension upstream of gene TSS in bp.',
+'ANNOTATION_PROMOTER_DOWNSTREAM':'Strand-aware promoter extension downstream of gene TSS in bp.',
+'ADA_RESOLUTION':'ADA grid independent of fine loop grids; default 10000 bp.',
+'APA_FLANK_BP':'Genomic flank around each loop anchor; divisible by every measured APA grid.',
+})
+DETAILS['LOOP_CALLER']='cooltools_dots on supported >=5-kb discovery grids, or the pinned Mustache adapter for fine grids.'
+DETAILS['FINE_RESOLUTION_QC_APPROVED']='Legacy informational flag; does not authorize 1-kb/sub-kb analysis. Use a reviewed eligibility registry.'
+DETAILS.update({
+'UPSTREAM_INPUTS':'Optional experiment-specific upstream input table for --prepare-inputs; existing finalized manifests can be used directly.',
+'ANALYSIS_PROFILE':'existing, practical_2_4kb, hsieh_inspired, hsieh_8grid or short_range_4kb. Fine-loop full profiles require compartments/saddle/report; module selections remain independent. Adapted presets do not claim exact historical reproduction.',
+'RUN_CHROMOSIGHT_DISCOVERY':'Independent CPU loop-template discovery; separate from fixed-candidate Chromosight scoring.',
+'CHROMOSIGHT_DISCOVERY_RESOLUTIONS':'Comma-separated native discovery grids; empty inherits loop discovery grids.',
+'CHROMOSIGHT_DISCOVERY_MIN_DISTANCE_BP':'Discovery lower bound; zero inherits LOOP_MIN_DISTANCE_BP. Must remain within the common measurement universe and upstream retained contacts.',
+'CHROMOSIGHT_DISCOVERY_MAX_DISTANCE_BP':'Discovery upper bound; zero inherits LOOP_MAX_DISTANCE_BP. Cannot exceed the common measurement universe.',
+'CHROMOSIGHT_DISCOVERY_MIN_PEARSON':'Minimum template correlation for independent candidates; descriptive caller scores, not biological P values.',
+'RUN_STRIPES':'Optional CPU StripePy discovery and condition support on common eligible chromosome segments.',
+'STRIPE_RESOLUTIONS':'Comma-separated authentic stripe grids; default 4000 bp.',
+'STRIPE_ENV_PREFIX':'Explicit separate StripePy prefix; never update the core prefix to add the caller.',
+'STRIPE_LOCK':'Optional exact StripePy Conda lock with reviewed hashed pip requirements.',
+'STRIPE_GENOMIC_BELT_BP':'Maximum native caller stripe/contact belt in bp.',
+'STRIPE_MAX_WIDTH_BP':'Maximum native stripe width in bp.',
+'STRIPE_MIN_RELATIVE_CHANGE':'Native percentage descriptor threshold; retained stripes also require inner mean above outer mean.',
+'STRIPE_NORMALIZATION':'Only none is supported by this tested raw-contact adapter.',
+'STRIPE_MASK_POLICY':'common_segments: split views at excluded bins; never replace missing biological measurements with zeros.',
+'RUN_BROWSER_EXPORT':'Export a dated unified browser bundle after enabled scientific stages; do not rerun measurements.',
+'EXPORT_UCSC':'Write custom-track headers and native BED/interact/bedGraph companions.',
+'EXPORT_HIGLASS':'Run available bigWig/beddb/bed2ddb converters; report missing converters explicitly. Does not register or render on a server.',
+'BROWSER_OUTPUT_DIR':'Optional new explicit bundle directory; empty uses a dated child of run/browser_tracks.',
+'HIGLASS_CHROMSIZES':'Optional default coordinate profile, validated against frozen reference evidence; native matrix profiles remain separate.',
+'BROWSER_ENV_PREFIX':'Optional separate converter environment; preserve existing scientific prefixes.',
+'BROWSER_LOCK':'Optional exact converter Conda lock with reviewed hashed pip requirements.',
+'AGGREGATE_WORKER_MEMORY_MB':'Decimal MB reserved per observation worker; zero chooses a bounded automatic estimate.',
+'QUANTIFY_WORKER_MEMORY_MB':'Decimal MB reserved per raw-count worker; zero chooses a bounded automatic estimate.',
+'QC_WORKER_MEMORY_MB':'Decimal MB reserved per QC grid worker; zero estimates native bins and real pixel chunk without clipping to fit.',
+'AGGREGATE_CHECKPOINTS':'Reuse only individually committed, identity- and checksum-validated observation/module/grid pileups.',
+'EXPECTED_CACHE':'Reuse run-owned expected curves only with matching input, weights, masks, views, parameters, implementation and environment identities.',
+'LIMIT_MATRIX_READERS':'Optional conservative inner/outer reader cap using MAX_PARALLEL_IO; disabled by default.',
+})
 properties=json.loads((ROOT/'schemas/config.schema.json').read_text())['properties']
 lines=['# Configuration reference','','On the shared server, copy project configurations into your own workspace and source the maintainer-controlled versioned site profile for checked software. Keep results/scratch outside the release; resource presets apply per run. See [shared user setup](16-shared-server-installation.md#3-start-as-an-ordinary-server-user).','','The project `.conf` is trusted Bash and is sourced after template defaults. Unknown uppercase assignments in that file are rejected; normalized allowed values are validated and snapshotted. This is a typo check, not a Bash security sandbox. Never source sample rows or an upstream configuration automatically.','','Relative configuration paths resolve against the project configuration directory. Manifest paths resolve against their own table directory. CLI `-s` resolves against the invocation directory. Source a resource preset explicitly, then place project overrides afterward. Missing optional paths are empty strings.','','```bash','source "/opt/conda_envs/microc2compare/releases/shared-design-json-fix-20261008/microc2compare-0.1.0/config/resources_pilot.conf"','PROJECT="experiment"','SAMPLESHEET="samples.csv"','TECHNICAL_MEMBERSHIP="technical_membership.tsv"','COMPARISONS="comparisons.tsv"','REFERENCE_REGISTRY="references.yaml"','source "/opt/conda_envs/microc2compare/site/shared-design-json-fix-20261008.conf"','```','','| Variable | Template default | Meaning |','|---|---|---|']
 for key,definition in properties.items():
@@ -117,4 +178,8 @@ for key,definition in properties.items():
     if isinstance(default,bool):default=str(default).lower()
     lines.append(f'| `{key}` | `{default}` | {description} |')
 lines+=['','Optional flags do not imply new-map permission. Invalid required weights/resolutions fail with upstream remediation. Statistical policy floors cannot be weakened below three formal/two preliminary units and two residual df. Tuning scientific settings changes completion/calibration keys and requires a reviewed pilot; no setting proves adequate 5-kb coverage automatically.']
-(ROOT/'docs/03-configuration.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+text='\n'.join(lines)+'\n'
+text=text.replace('and source the maintainer-controlled versioned site profile for checked software','and use the published launcher, which loads the checked software profile internally')
+text=text.replace('source "/opt/conda_envs/microc2compare/site/shared-design-json-fix-20261008.conf"','RUN_ID="new_variant001" # software settings are supplied by the shared command')
+text=text.replace('/opt/conda_envs/microc2compare/releases/shared-design-json-fix-20261008/microc2compare-0.1.0', '/path/to/microc2compare-0.4.0')
+(ROOT/'docs/03-configuration.md').write_text(text,encoding='utf-8')

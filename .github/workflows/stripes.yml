@@ -1,0 +1,60 @@
+name: optional-cpu-stripes
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pinned-stripepy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          auto-activate: true
+          activate-environment: ""
+          channels: conda-forge,bioconda
+          channel-priority: strict
+      - name: Create isolated core and NumPy 2 stripe prefixes
+        run: |
+          conda env create -p "$RUNNER_TEMP/m2c-core" -f environment.yml
+          conda env create -p "$RUNNER_TEMP/m2c-stripes" -f envs/stripes.yml
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-stripes" python -m pip install pytest==8.3.5
+      - name: Actual one/two-process caller and metadata/report contracts
+        run: |
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-stripes" python -m pytest -q tests/test_stripes.py
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-core" python -m pytest -q tests/test_culture_metadata.py tests/test_stripe_report.py
+      - name: Fresh custom assembly, uneven cultures, report/browser and resume
+        run: |
+          export STRIPE_FIXTURE="$RUNNER_TEMP/stripe-fresh"
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-core" python tests/stripe_fresh_project.py \
+            --out "$STRIPE_FIXTURE" --core-prefix "$RUNNER_TEMP/m2c-core" \
+            --stripe-prefix "$RUNNER_TEMP/m2c-stripes" --conda-exe "$(command -v conda)"
+          sha256sum "$STRIPE_FIXTURE"/*.cool > "$RUNNER_TEMP/stripe-input-sha256.txt"
+          bash scripts/microc2compare.sh -c "$STRIPE_FIXTURE/project.conf" --analysis stripes,browser_export --dry-run
+          bash scripts/microc2compare.sh -c "$STRIPE_FIXTURE/project.conf" --analysis stripes,browser_export
+          bash scripts/microc2compare.sh -c "$STRIPE_FIXTURE/project.conf" --analysis stripes,browser_export --resume
+          sha256sum --check "$RUNNER_TEMP/stripe-input-sha256.txt"
+          test -z "$(find "$STRIPE_FIXTURE/results" "$STRIPE_FIXTURE/scratch" -name '*.cool' -o -name '*.mcool')"
+          conda run --no-capture-output -p "$RUNNER_TEMP/m2c-core" python -c 'import json,os; from pathlib import Path; from microc2compare.state import complete; root=Path(os.environ["STRIPE_FIXTURE"])/"results/freshStripe/newSet/newRun"; c=json.loads((root/"00_metadata/config.json").read_text()); assert all(complete(c,"stripes",sid) for sid in ("newA","newB","newC")); assert all(complete(c,stage,"run") for stage in ("register","stripe_consensus","browser_export","report")); details=[json.loads((root/f"03_features/stripes/{sid}.4000.json").read_text()) for sid in ("newA","newB","newC")]; assert all(d["excluded_bin_count"]==1 and d["eligible_segment_count"]==2 and d["retained_count"]>=1 for d in details); assert (root/"08_reports/stripe_support.tsv").is_file()'
+        env:
+          PYTHONPATH: src
+      - name: Retain caller, scope and report acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: optional-stripe-acceptance
+          path: |
+            ${{ runner.temp }}/stripe-fresh/results/freshStripe/newSet/newRun/00_metadata
+            ${{ runner.temp }}/stripe-fresh/results/freshStripe/newSet/newRun/logs
+            ${{ runner.temp }}/stripe-fresh/results/freshStripe/newSet/newRun/completion
+            ${{ runner.temp }}/stripe-fresh/results/freshStripe/newSet/newRun/03_features/stripes
+            ${{ runner.temp }}/stripe-fresh/results/freshStripe/newSet/newRun/browser_tracks
+            ${{ runner.temp }}/stripe-fresh/results/freshStripe/newSet/newRun/08_reports
+          if-no-files-found: ignore

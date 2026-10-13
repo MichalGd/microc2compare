@@ -1,5 +1,7 @@
 # Scientific methods
 
+For 0.3.0 Mustache/Chromosight adaptations, complete multi-resolution measurement, original-call preservation and projected/collapsed pixels, see [fine-loop methods](28-fine-resolution-loops.md). Independently configured insulation/TAD/ADA and optional compartment/saddle methods remain available. Autosome selection defaults on; stored upstream weights retain their original balancing scope. Reports separate the requested distance range from Mustache's effective near-diagonal discovery limit.
+
 ## Quantities and analysis domain
 
 Raw counts are nonnegative integer unique-contact pixels. Balanced values multiply those counts by validated stored upstream weights; divisive weights are inverted in memory. Expected values are average contacts per eligible pixel at a view-specific genomic separation. Observed/expected (O/E), log2 insulation, boundary prominence and caller enrichment are distinct quantities. None substitutes for raw counts in the loop differential model.

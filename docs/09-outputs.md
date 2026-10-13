@@ -1,5 +1,7 @@
 # Outputs and interpretation
 
+Release 0.3.0 adds resolution-specific counts, candidate aliases, Chromosight score/status tables, annotation/browsable anchors, per-grid comparison effects and APA/ADA/saddle PNG/SVG. See [the module/output table](28-fine-resolution-loops.md#5-separate-modules-and-outputs) and [annotation columns](29-loop-anchor-annotation.md#what-is-recorded). `08_reports/contact_retention.tsv` explains native totals versus distance/mask-eligible contacts; `08_reports/*resolution_effects.tsv` retains candidate aliases and collision/projection flags. Plots preserve downloadable numerical arrays and coverage. Primary-resolution aliases remain for compatibility; resolution directories are authoritative. In 0.3.1, full practical/Hsieh-inspired reports require per-replicate and condition saddle plots (`08_reports/figures/saddle.RES.UNIT.{png,svg}`), their numerical NPZ arrays and the per-replicate segregation summary; missing current arrays stop report completion.
+
 Every run is scoped by `OUTDIR/PROJECT/ANALYSIS_SET_ID/RUN_ID`. Imported contact maps are registered by path/group and SHA256 rather than copied into this tree.
 
 Use [the module catalogue](17-analysis-modules.md) for launch commands, required inputs and parameter changes. [The TAD guide](18-tad-analysis.md#exact-outputs) lists domain/event files and column meanings. Only enabled/selected modules emit scientific products.
@@ -13,6 +15,7 @@ Use [the module catalogue](17-analysis-modules.md) for launch commands, required
 | `00_metadata/preflight.json` | Validated software/input status and allocation checks |
 | `00_metadata/masks/*.npz` | Common mask/view labels and per-sample inherited weights, no contact matrix |
 | `00_metadata/masks/*.bins.tsv`, `*.views.tsv` | Exact bin axes and analysis views |
+| `00_metadata/masks/*.scope.json` | Selected chromosomes, common usable bins per chromosome, excluded native sequences, actual upstream chromosome policies and inherited balancing recipes |
 | `00_metadata/status/*.json` | Disabled stage states |
 | `01_qc/contacts/*.json` | Raw cis/trans totals, eligible loop exposure and excluded-bin fraction |
 | `01_qc/ps/*.tsv` | View/distance raw/balanced sums, eligible denominator and averages |
@@ -51,5 +54,7 @@ If a loop's raw count rises from 100 to 180 but its sample exposure doubles, its
 A positive `case_minus_reference_log2_insulation` means a higher relative insulation score in the case condition at that fixed bin; it does not automatically mean a stronger boundary. Prominence exists only at called minima. A significant bin can be annotated as near a boundary afterward; the testing family still includes all eligible primary-grid bins.
 
 A compartment sign switch is descriptive and meaningful only where both components were confidently oriented using the same track. Saddle AA/BB/AB ratios and APA/ADA strengths summarize matched O/E with recorded denominators; compare per-replicate behavior rather than treating pool/seed products as biological observations.
+
+The final HTML embeds each replicate and equal-replicate condition saddle. Both axes run from the low, B-like end to the high, A-like end of the common compartment ordering: B–B is at the upper left, A–A at the lower right, and mixed A–B contacts are in the other corners. Red means higher than expected and blue lower than expected; the colour bar is log2 O/E. Blank pixels have no finite positive value on that scale; use the NPZ values and coverage counts to distinguish observed zeros from unavailable pixels. `segregation_ratio=(AA+BB)/(2*AB)` summarizes corner enrichment per replicate. These summaries describe compartment organization and carry no differential P value.
 
 Review `inference_status`, `validation_status`, eligibility reasons and report stage states before using an effect. `uncalibrated` labels can never be converted into production evidence merely because the command exited successfully. Pointwise confidence intervals have no simultaneous-coverage guarantee; loop intervals additionally carry an approximate-method label.

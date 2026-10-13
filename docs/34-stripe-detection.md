@@ -7,6 +7,12 @@ records descriptive geometric and signal measurements. Install the separate
 software profile; its NumPy 2 dependencies are separate from the accepted loop
 environment. The supported version is checked before discovery.
 
+The recipe pins Python 3.11, NumPy 2.2.6 and SciPy 1.17.1. The
+[conda-forge SciPy package](https://anaconda.org/conda-forge/scipy) provides
+Python 3.11 builds compatible with this NumPy version. SciPy 1.17.1 was also
+used in the local real-caller tests, with NumPy 2.4.6; the exact Linux recipe
+is checked separately by the stripe CI job.
+
 ```bash
 microc2compare -c /your/project/project.conf --analysis stripes --dry-run
 microc2compare -c /your/project/project.conf --analysis stripes

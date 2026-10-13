@@ -11,7 +11,9 @@ The current Windows runtime cannot complete the native Mustache probe because it
 See [the public numerical evidence](general-purpose-040-local.json) and [the upgrade guide](../docs/35-general-purpose-upgrade.md). The synthetic expected-table benchmark measures construction/FFT work; the dependency-cache benchmark measures validation overhead. Neither is a target-server speedup prediction. Real converter decoding, HiGlass rendering, shared-server scaling, real-data 4-kb/stripe sensitivity and formal biological calibration remain pending. No original biological inputs/results, installed environments or active server command were changed.
 
 
-## Project convenience — 0.3.2, 10 October 2026
+The first hosted R-adapter job passed. Hosted stripe setup stopped before scientific execution because the original SciPy pin was unavailable; the optional recipe now uses the actual locally tested SciPy 1.17.1, with seven one/two-process caller tests passing. Browser runtime paths were moved from an invalid job-level context into an early step. The revised hosted checks remain pending; these changes affect environment/CI definitions and documentation only.
+
+## Project convenience â€” 0.3.2, 10 October 2026
 
 **Executed full regression suite: 213 passed, 6 skipped, 49 warnings in 607.80 seconds.** Command: `.devtools/python/python.exe -u -I -B -m pytest -q --basetemp .local/pytest-032-release-final-10oct26 --disable-warnings --maxfail=5`, with private plotting caches. An earlier focused run passed 32 tests with one platform skip in 308.64 seconds. These counts overlap and are not added together. The full suite includes the final parameter-variant interface and early bootstrap user-site isolation changes. The six skips remain two actual cooltools integrations, two actual R tests, Linux process-group interruption and Unix permission-bit semantics on Windows.
 
@@ -23,7 +25,7 @@ Current user guides use `microc2compare --init`, config-aware import/resource re
 
 **Pending:** target-server installation/activation and full execution by another researcher; actual Linux Mustache, compartment/saddle and process/access acceptance; real-data fine-grid/phasing/coverage pilot; and applicable biological statistical calibration before formal inference. No server connection, real-data analysis, environment mutation or GitHub publication was performed by this convenience update. The scientific methods, autosome default, sex-chromosome opt-in, required full-profile saddles and statistical gates remain as in 0.3.1. Older dated records below retain their original scope.
 
-## Required saddle plots and final reports — 0.3.1, 10 October 2026
+## Required saddle plots and final reports â€” 0.3.1, 10 October 2026
 
 Full practical/Hsieh-inspired profiles require compartments, saddle aggregates and a final HTML report. Explicit individual-module runs remain selective. The example enables the 100-kb compartment grid, APA/ADA/saddle and the final report. Preflight validates the registered phasing track before contact scans; no eligible shared oriented partition is a clear failure. Full reports require current arrays for every biological replicate and condition. They embed PNG plots, link SVG and numerical NPZ products, show per-replicate segregation summaries, and explain the colours, compartment corners, observed zeros and missing coverage. Condition means weight biological replicates equally.
 
@@ -37,7 +39,7 @@ The delivery is `microc2compare-0.3.1-required-saddles-10oct26.zip`, with an all
 
 **Pending:** actual Linux caller/compartment/saddle acceptance, server installation and activation, a complete private-workspace run by another researcher, real-data phasing/resource and fine-grid coverage review, and resolution/design-specific calibration before formal inference. No server connection, real-data run or GitHub publication was performed by this amendment. Earlier dated records below retain their original verification scope.
 
-## Fine-resolution loop candidate — 0.3.0, 10 October 2026
+## Fine-resolution loop candidate â€” 0.3.0, 10 October 2026
 
 The local implementation adds Mustache discovery, a source-preserving cross-resolution catalogue, complete 2/4-kb quantification, fixed-candidate Chromosight scoring, both-anchor GTF/cCRE annotation, per-grid APA/comparisons/volcano exports, and viewable APA/ADA/saddle products. Autosome selection is the default for mouse and human, with explicit sex-chromosome options and frozen scope/view identity. Insulation/TAD/ADA retain separate resolutions. Imported raw counts and stored weights remain read-only; an explicit preparation helper reuses existing grids and balances only new integer coarsenings in a new directory. Shared core/HiCRep/R prefixes are reused; optional caller software is separate.
 
@@ -61,7 +63,7 @@ The 0.2.7 change affects only input discovery/export and supporting CLI, validat
 
 Scientific stage implementations, R adapters, source-signature inputs, software profiles and environments remain unchanged from 0.2.6. The source archive verifies that compatibility before delivery. Existing immutable releases, real matrices and GitHub publication are untouched. Target-server helper acceptance and real-data provenance review remain pending; no inference calibration is claimed.
 
-## Common chromosomes, X/Y and human reference handling — 0.2.6
+## Common chromosomes, X/Y and human reference handling â€” 0.2.6
 
 The supplied server diagnostics establish a chromosome-scope difference: newly regrouped mESC maps have 39 extra scaffolds, while the basal maps contain the same 22 canonical chromosomes with matching shared lengths. All eight maps have converged stored weights at 10/100 kb after the reported B4 repair. No new real-data matrices or installed server files were modified by the assistant.
 
@@ -79,7 +81,7 @@ The maintainer reported successful 0.2.5 profile-bound QC/report execution, vali
 
 Software installation and automatic loading are complete for that checked deployment. This representative interface acceptance supplements the earlier full/selected/variant descriptive and R numerical checks. It does not establish real-data validity, statistical calibration or full ordinary-researcher execution. Those gates remain pending. GitHub CI execution is separate from the existing server/local checks.
 
-## Automatic software profiles 0.2.5, prepared 8–9 October 2026
+## Automatic software profiles 0.2.5, prepared 8â€“9 October 2026
 
 Profile-bound publication pins a checked site's absolute path and SHA256. The main launcher applies only whitelisted software settings after project configuration and records the effective profile in normalized metadata. Intentional CLI/environment overrides are explicit; changed or failed defaults stop execution. Analysis settings and user input/output/resource choices remain in the project. Direct unbound invocation retains its existing behavior. Scientific/R implementations and environment packages are unchanged from 0.2.4, but changing the common shell helper conservatively invalidates stage source fingerprints.
 
@@ -239,6 +241,6 @@ The selected local contracts, descriptive comparison, calibration-domain and rea
 
 ## Remaining release gates
 
-Full Linux compartments/insulation/dots/aggregates and masked API compatibility; actual R effect/offset/uncertainty tests; Linux interruption/reaping; exact lock recreation/drift checks; prespecified ≥200-dataset calibration per supported module/design; biological negative controls; public-data/reference/membership validation; actual server inventory/resource pilot; and non-maintainer multi-user deployment acceptance remain open. The CI definition and tests exist locally but were not run by GitHub.
+Full Linux compartments/insulation/dots/aggregates and masked API compatibility; actual R effect/offset/uncertainty tests; Linux interruption/reaping; exact lock recreation/drift checks; prespecified â‰¥200-dataset calibration per supported module/design; biological negative controls; public-data/reference/membership validation; actual server inventory/resource pilot; and non-maintainer multi-user deployment acceptance remain open. The CI definition and tests exist locally but were not run by GitHub.
 
 No passing calibration artifact is supplied. Formal/preliminary runs without matching evidence fail preflight; explicitly uncalibrated method development remains labeled. Synthetic success is not a production-readiness or biological-equivalence claim. Project licensing/legal ownership also remains a documented publication decision.

@@ -72,7 +72,8 @@
       "older_bundles_preserved": true,
       "native_caller_numpy": "2.4.6",
       "core_numpy": "1.26.4",
-      "acceptance_record_sha256": "c22a221a94055b83d1de3ece7804be54ef3a02b70a0c0fed59aee9e863f38356"
+      "acceptance_record_sha256": "c22a221a94055b83d1de3ece7804be54ef3a02b70a0c0fed59aee9e863f38356",
+      "native_caller_scipy": "1.17.1"
     }
   },
   "optional_caller_isolation": {
@@ -134,5 +135,17 @@
     "A 4-kb bin does not demonstrate detection at 4-kb separation.",
     "No source matrix rebalance, cohort rerun or shared alias activation.",
     "No new statistical significance claimed."
-  ]
+  ],
+  "hosted_CI_initial_commit": {
+    "commit": "e8d9cf511c1fdcf41ea67abbb74bc345adf8ed60",
+    "r_adapter_job": "success; numerical adapter checks, not statistical calibration",
+    "stripe_job": "failed before caller execution: scipy=1.15.3 unavailable from configured channels",
+    "browser_workflow": "not scheduled; job-level runner context corrected",
+    "corrections": {
+      "stripe_recipe": "SciPy 1.17.1; compatible with Python 3.11/NumPy 2.2.6 and locally actual tested caller runtime",
+      "stripe_retest": "7 passed, including one/two processes, 16.19seconds",
+      "browser_workflow": "early runtime-directory step with GITHUB_ENV; YAML and space-containing path initialization smoke passed"
+    },
+    "updated_hosted_checks": "pending on revised commit"
+  }
 }

@@ -6,7 +6,7 @@ dependencies:
   - python=3.11
   - numpy=2.2.6
   - pandas=2.2.3
-  - scipy=1.15.3
+  - scipy=1.17.1
   - h5py=3.13.0
   - cooler=0.10.4
   - pyyaml

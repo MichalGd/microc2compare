@@ -10,14 +10,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
-      CONDA_PKGS_DIRS: ${{ runner.temp }}/browser-conda-pkgs
       M2C_REQUIRE_BROWSER_CONVERTERS: "1"
-      M2C_BROWSER_ACCEPTANCE_DIR: ${{ runner.temp }}/browser-acceptance
     defaults:
       run:
         shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4.2.2
+      - name: Initialize browser runtime directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/browser-conda-pkgs" "$RUNNER_TEMP/browser-acceptance"
+          printf 'CONDA_PKGS_DIRS=%s\n' "$RUNNER_TEMP/browser-conda-pkgs" >> "$GITHUB_ENV"
+          printf 'M2C_BROWSER_ACCEPTANCE_DIR=%s\n' "$RUNNER_TEMP/browser-acceptance" >> "$GITHUB_ENV"
       - uses: conda-incubator/setup-miniconda@v4
         with:
           miniforge-version: latest

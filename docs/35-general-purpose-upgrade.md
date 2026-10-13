@@ -6,6 +6,9 @@ comparison, a prior loop-export bundle and particular observation names/counts
 are not prerequisites. Arbitrary reference identifiers are supported; their
 chromosome lengths and view scope must be supplied. Assembly-matched annotations
 are required only when annotation is enabled.
+For browser export, the chromosome-size file must include every native matrix
+chromosome, including scaffolds excluded from analysis views. Native coordinate
+profiles require these lengths even for UCSC-only output.
 The example `mm39` default is a convenience, not an assembly restriction.
 
 ## Start a new project

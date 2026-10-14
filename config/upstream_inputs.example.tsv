@@ -1,0 +1,3 @@
+samplesheet	upstream_results	individual_matrices
+/your/project/mESCs.samples.csv	/your/project/mESCs-regrouped	false
+/your/project/basal.samples.csv	/your/upstream/basal	true

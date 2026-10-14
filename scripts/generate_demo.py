@@ -21,7 +21,7 @@ def generate(output,development=False,raw_only=False,core_prefix=None):
     phase=root/"phasing.bedgraph"
     phase.write_text("".join(f"chrDemo\t{i*100000}\t{(i+1)*100000}\t{np.sin(i/7):.8f}\n" for i in range(60)))
     reference=root/"references.json"
-    atomic_json(reference,{"reference_id":"demo","chromsizes":str(sizes),"chromsizes_sha256":file_hash(sizes),"views":str(views),"views_sha256":file_hash(views),"phasing_track":str(phase),"phasing_track_sha256":file_hash(phase)})
+    atomic_json(reference,{"reference_id":"demo","chromosome_classes":{"autosomes":["chrDemo"],"sex":[]},"chromsizes":str(sizes),"chromsizes_sha256":file_hash(sizes),"views":str(views),"views_sha256":file_hash(views),"phasing_track":str(phase),"phasing_track_sha256":file_hash(phase)})
     bins=pd.DataFrame({"chrom":"chrDemo","start":np.arange(0,6000000,10000),"end":np.arange(10000,6000001,10000)})
     i,j=np.triu_indices(len(bins));distance=j-i
     compartment=np.sin(np.arange(len(bins))/70)

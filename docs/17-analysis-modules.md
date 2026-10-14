@@ -1,20 +1,22 @@
 # Analysis catalogue: inputs, commands, settings and outputs
 
+**0.3.0 additions:** `chromosight` and `annotation` are independently selectable. Loop discovery/quantification/comparison and APA support complete resolution lists, while ADA uses `ADA_RESOLUTION` and saddle uses `COMPARTMENT_RESOLUTION`. Autosome selection is the default. For new commands, inputs, settings, per-resolution outputs and interpretation, use [the fine-resolution module table](28-fine-resolution-loops.md#5-separate-modules-and-outputs) and [anchor annotation](29-loop-anchor-annotation.md). Primary-resolution aliases preserve older output paths below. The published command handles software settings and private caches internally; no separate user `source` or clean-shell session is required.
+
 Use this guide to choose an analysis and find its results. A contact matrix records how often two genomic bins interact. A bin is a fixed-length genome interval. A biological sample is one independent animal, donor or culture, with its technical libraries consolidated upstream.
 
 Every analysis reads original contact counts and, where required, existing upstream balancing weights. No command below installs packages or creates a copy of an imported matrix. Results are private/user-managed: `OUTDIR/PROJECT/ANALYSIS_SET_ID/RUN_ID`; temporary work uses `SCRATCH_ROOT`. Both paths are configurable. Relative paths in `project.conf` resolve against that file's directory.
 
 ## Start, select and resume
 
-These are **Linux Bash commands**, run after the dedicated-session setup in [shared installation](16-shared-server-installation.md#3-start-as-an-ordinary-server-user). Set the source and configuration paths first; replace the project path with yours. The example uses the new candidate directly, so it does not change the existing global command.
+These are Linux Bash commands in your normal login. The accepted shared launcher supplies software and runtime settings automatically. Set only your project-specific configuration path:
 
 ```bash
-m2c_src="/opt/conda_envs/microc2compare/releases/agreement-20261008/microc2compare-0.2.3"
-m2c_conf="$HOME/microc2compare-work/projects/pilot/config/project.conf"
-bash "$m2c_src/scripts/microc2compare.sh" --list-analyses
-bash "$m2c_src/scripts/microc2compare.sh" -c "$m2c_conf" --analysis tads --dry-run
-bash "$m2c_src/scripts/microc2compare.sh" -c "$m2c_conf" --analysis tads
-bash "$m2c_src/scripts/microc2compare.sh" -c "$m2c_conf" --analysis tads --resume
+m2c_conf="$HOME/my_microc_project/config/project.conf"
+microc2compare --list-analyses
+microc2compare -c "$m2c_conf" --analysis tads --dry-run
+microc2compare -c "$m2c_conf" --analysis tads
+microc2compare -c "$m2c_conf" --analysis tads --resume
+microc2compare -c "$m2c_conf" --validate
 ```
 
 The first execution needs a new run directory. An existing run requires `--resume`. Keep the same selection when resuming. If you deliberately change selection, registration/dependent results may need refreshing; the runner checks compatibility. Necessary prerequisites are enabled automatically and run in their usual order. Disabled analyses create no placeholder scientific files. A report is produced unless `RUN_FINAL_REPORT=false`.
@@ -62,7 +64,7 @@ Use real tab characters or the supplied CSV/TSV writer when creating the file. F
 
 **Outputs:** `03_features/compartments/SAMPLE.tsv`, `.eigenvalues.tsv`, `.phasing.json`, and `.bedgraph`. Tables retain components, selected component and oriented scores; QC records orientation correlations. BedGraph is a continuous browser track. Ambiguous orientations remain NA. Compartment comparisons/sign changes are descriptive; no formal compartment FDR is generated.
 
-**Troubleshooting:** a missing/misaligned phasing track or oversized view needs input/view correction. Compartments and saddle require phasing; TAD-only and loop-only analyses do not.
+**Troubleshooting:** a missing/misaligned phasing track or oversized view needs input/view correction. Compartments and saddle require phasing; TAD-only and loop-only analyses do not. Full `practical_2_4kb`/`hsieh_inspired` profiles require compartments and saddle plots in the final report; `--analysis` selections still enable only their prerequisites.
 
 ## Insulation, boundaries and TADs
 
@@ -90,11 +92,11 @@ O/E means observed contacts divided by expected contacts at the same genomic dis
 
 | Selection | Inputs/prerequisites | Settings and meaning | Outputs |
 |---|---|---|---|
-| `--analysis apa` | Loop grid/weights; independent candidates if supplied, otherwise loop discovery/consensus | Existing loop resolution; fixed 100-kb flank in v0.2; average enrichment around anchors | `05_aggregates/apa/SAMPLE.npz` with `mean,sum,valid_feature_count`; `summary.tsv` with central O/E and contribution counts |
-| `--analysis ada` | Insulation/consensus boundary-derived domains and the existing loop-resolution grid/weights | Primary insulation window; domains rescaled to 50 bins; O/E inside the common domain set | `05_aggregates/ada/SAMPLE.npz` with `mean,sum,valid_domain_count`; `04_quantification/domain_scores/strength.tsv` with mean intra-domain O/E and eligible-pixel count |
-| `--analysis saddle` | Compartments, exact phasing and compartment grid/weights; no loop grid needed | `SADDLE_PARTITION_SOURCE=replicate_rank_mean`; 50 fixed compartment groups; optional registered external/pool source | `05_aggregates/saddle/SAMPLE.npz` with `mean,sum,valid_pixel_count`; partition TSV/JSON; `summary.tsv` with AA, BB, AB and segregation ratio |
+| `--analysis apa` | Loop grids/weights; independent candidates if supplied, otherwise loop discovery/consensus | `LOOP_QUANTIFICATION_RESOLUTIONS`, `APA_FLANK_BP`; average enrichment around anchors | `05_aggregates/apa/RES/SAMPLE.npz` with `mean,sum,valid_feature_count`; per-grid summary, condition means and report PNG/SVG |
+| `--analysis ada` | Insulation/consensus boundary-derived domains and `ADA_RESOLUTION` grid/weights | Primary insulation window; domains rescaled to 50 bins; O/E inside the common domain set | `05_aggregates/ada/SAMPLE.npz` with `mean,sum,valid_domain_count`; condition means, report PNG/SVG and `04_quantification/domain_scores/strength.tsv` |
+| `--analysis saddle` | Compartments, exact phasing and `COMPARTMENT_RESOLUTION` grid/weights; no loop grid needed | `SADDLE_PARTITION_SOURCE=replicate_rank_mean`; 50 fixed compartment groups; optional registered external/pool source | `05_aggregates/saddle/SAMPLE.npz` with `mean,sum,valid_pixel_count`; condition means, partition TSV/JSON, AA/BB/AB/segregation summary and report PNG/SVG |
 
-`AGGREGATE_MODULES="apa,ada,saddle"` controls aggregates in a configured full pipeline. Named selection chooses only its requested aggregate consumers. Report heatmaps are generated only for requested modules with finite values. Empty feature sets can produce valid arrays containing NA and zero contribution counts. Do not treat the number of pileup windows as biological replication.
+`AGGREGATE_MODULES="apa,ada,saddle"` controls aggregates in a configured full pipeline. Full practical/Hsieh-inspired profiles require saddle and its compartment/report prerequisites. Named selection chooses only its requested aggregate consumers. Empty loop/domain feature sets can produce valid arrays containing NA and zero contribution counts, with an explicit report explanation. A saddle without any eligible shared oriented partition fails rather than producing a completed empty plot. Do not treat the number of pileup windows as biological replication.
 
 ## Condition comparisons
 
@@ -118,16 +120,14 @@ Inferential loop comparisons automatically include [volcano plots](22-loop-volca
 
 Every selected run retains normalized configuration, input SHA256 identities, software inventories, logs, completion records and measured task timing. `08_reports/index.html` explains selection, parameters, stage status and downloadable products. Keep the complete run folder when downloading it so images and relative links work.
 
-Create a parameter variant **beside** the original config to preserve relative paths. This helper does not run the configuration or analysis, and refuses an existing destination:
+Create a parameter variant beside the original configuration through the same installed command:
 
 ```bash
-m2c_variant="$(dirname "$m2c_conf")/tads-threshold-05.conf"
-"$PYTHON_BOOTSTRAP" "$m2c_src/scripts/create_variant.py" \
-  --config "$m2c_conf" --out "$m2c_variant" --run-id tads-threshold-05 \
+microc2compare -c "$m2c_conf" --variant tads-threshold-05 \
   --set INSULATION_BOUNDARY_THRESHOLD=0.5
-bash "$m2c_src/scripts/microc2compare.sh" -c "$m2c_variant" --analysis tads --dry-run
-bash "$m2c_src/scripts/microc2compare.sh" -c "$m2c_variant" --analysis tads
 ```
+
+The command preserves the original file and prints a new sibling configuration with the new run ID and literal parameter override. Use that printed path with `--analysis tads --dry-run`, then `--analysis tads`. Relative paths retain their meaning. No Python/source path is required. The advanced standalone `create_variant.py` helper remains available.
 
 All variants read the same original matrices. Different run IDs preserve earlier results; cross-run scientific product reuse is not automatic. Within one run, parameter/signature checks reuse compatible outputs. Source changes are deliberately conservative and can require broader recomputation. Never edit completion signatures to force reuse.
 

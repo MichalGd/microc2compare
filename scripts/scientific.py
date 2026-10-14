@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import csv
 import json
 import os
 import shutil
@@ -12,6 +13,24 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
 from microc2compare.contracts import atomic_json, require
 from microc2compare.state import complete, inventory, publish_completion, record_path
+
+
+def validated_empty_browser_output(path):
+    """Empty native tracks are valid only when the exporter inventory says so."""
+    if path.suffix.lower() not in (".bed", ".bedpe", ".bedgraph"):
+        return False
+    for parent in path.parents:
+        inventory_path = parent / "inventory.tsv"
+        if inventory_path.is_file():
+            with inventory_path.open(encoding="utf-8", newline="") as stream:
+                for row in csv.DictReader(stream, delimiter="\t"):
+                    if row.get("rows") == "0" and any(
+                        row.get(key) and (parent / row[key]).resolve() == path.resolve()
+                        for key in ("raw_path", "bedpe_path")
+                    ):
+                        return True
+            return False
+    return False
 
 
 def main():
@@ -55,13 +74,18 @@ def main():
     require(outputs,f"{args.stage}: no validated product returned")
     for output in outputs:
         path=Path(output)
-        require(path.is_file() and path.stat().st_size>0,f"Missing/empty required output {path}")
+        require(path.is_file() and (path.stat().st_size > 0 or
+                (args.stage == "browser_export" and validated_empty_browser_output(path))),
+                f"Missing/empty required output {path}")
         if path.suffix==".json":json.loads(path.read_text())
     empty=False
-    if args.stage=="loops":
+    if args.stage in ("loops", "chromosight_discovery", "stripes"):
         import pandas as pd
-        empty=all(len(pd.read_csv(p,sep="\t"))==0 for p in outputs)
-    publish_completion(c,args.stage,args.scope,outputs,empty=empty,extra={"argv":sys.argv,"environment":inventory(),"elapsed_seconds":time.monotonic()-started,"exit_code":0,"normalization":"inherited_upstream_weights"})
+        call_tables = [p for p in outputs if Path(p).suffix == ".tsv"]
+        if args.stage == "stripes":
+            call_tables = [p for p in call_tables if Path(p).name.startswith(args.scope + ".") and Path(p).name[len(args.scope)+1:-4].isdigit()]
+        empty=bool(call_tables) and all(len(pd.read_csv(p,sep="\t"))==0 for p in call_tables)
+    publish_completion(c,args.stage,args.scope,outputs,empty=empty,extra={"argv":sys.argv,"environment":inventory(),"elapsed_seconds":time.monotonic()-started,"exit_code":0,"normalization":"raw_counts" if args.stage in ("stripes", "stripe_consensus") else "export_of_saved_measurements" if args.stage == "browser_export" else "inherited_upstream_weights"})
     atomic_json(Path(c["run_dir"])/f"benchmarks/{args.stage}.{args.scope}.json",{"wall_seconds":time.monotonic()-started,"pid":os.getpid()})
     if args.stage=="report":cleanup_derived(c)
     if c["CLEAN_SCRATCH_ON_SUCCESS"]:

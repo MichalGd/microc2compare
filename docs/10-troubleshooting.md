@@ -1,5 +1,7 @@
 # Troubleshooting
 
+For 0.3.0 missing fine grids, caller imports, dense-memory bounds, sparse windows, chromosome-scope migration and empty discoveries, follow [fine-resolution troubleshooting](28-fine-resolution-loops.md#resources-and-troubleshooting). Existing run scope cannot be changed in place; use its original versioned command or a new RUN_ID. Missing grids are never silently skipped, and masked outputs must not be interpreted as biological disappearance.
+
 If acceptance stops at `compartments/C1.tsv differ` after both runs validated, measure oriented-score agreement before concluding that biology differs. Version 0.2.3 adds strict numerical/per-view raw-sign comparison; use [the correction guide](23-compartment-agreement.md). Meaningful score, coordinate, mask, component, eigenvalue and phasing disagreements still fail.
 
 | Failure | Action |

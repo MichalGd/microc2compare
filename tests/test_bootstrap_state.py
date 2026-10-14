@@ -46,7 +46,9 @@ def registered_state(tmp_path, config):
                   source_kind='independent_library', dedup_group_id='lib1',
                   dedup_scope='joint_library', source_checksum='a'*64)
     write_table(tmp_path/'technical_membership.tsv', [member], list(member))
-    atomic_json(tmp_path/'references.json', {'reference_id':'demo'})
+    (tmp_path/'sizes.tsv').write_text('chrTest\t100000\n')
+    (tmp_path/'views.bed').write_text('chrTest\t0\t100000\tchrTest\n')
+    atomic_json(tmp_path/'references.json', {'reference_id':'demo','chromsizes':'sizes.tsv','views':'views.bed','chromosome_classes':{'autosomes':['chrTest']}})
     values = {k: str(v).lower() if isinstance(v, bool) else str(v) for k,v in config.items()}
     for key in values:
         if key.startswith('RUN_'): values[key]='false'

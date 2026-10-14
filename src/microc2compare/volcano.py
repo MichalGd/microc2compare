@@ -38,7 +38,7 @@ def prepare_points(frame, fdr, minimum_effect=0.):
     return points, counts
 
 
-def render_loop_volcanoes(c, comparisons, current_outputs):
+def _render_single(c, comparisons, current_outputs):
     """Consume only configured, currently validated differential output paths."""
     import matplotlib.pyplot as plt
 
@@ -55,10 +55,13 @@ def render_loop_volcanoes(c, comparisons, current_outputs):
         if "loops" not in c.get("_comparison_modules", ["loops", "insulation"]): continue
         cid = comparison["comparison_id"]
         require(IDENTIFIER.fullmatch(cid), "Unsafe loop comparison ID")
+        resolution=c.get('_volcano_resolution')
+        plot_id=cid+('.'+str(resolution) if resolution else '')
         entry = {"comparison_id": cid, "case": comparison["case_condition"], "reference": comparison["reference_condition"],
                  "status": "unavailable", "reason": "", "inference": comparison["inference"]}
         statuses.append(entry)
         result = root / "06_comparisons" / cid / "loops.tsv"
+        if resolution:result=result.parent/str(resolution)/result.name
         parameters = result.parent / "parameters.json"
         if not c.get("PLOT_LOOP_VOLCANO", True):
             entry["reason"] = "Disabled by PLOT_LOOP_VOLCANO=false."
@@ -88,7 +91,7 @@ def render_loop_volcanoes(c, comparisons, current_outputs):
         if points.empty:
             entry["reason"] = "No retained loops have finite model effects and valid biological P values/FDR."
             continue
-        points_path = directory / (cid + ".points.tsv")
+        points_path = directory / (plot_id + ".points.tsv")
         points.to_csv(points_path, sep="\t", index=False)
         outputs.append(points_path)
         fig, ax = plt.subplots(figsize=(7, 5))
@@ -108,7 +111,7 @@ def render_loop_volcanoes(c, comparisons, current_outputs):
                         xytext=(4, 5), textcoords="offset points", fontsize=7)
         badge = saved["inference"].upper()
         if saved["validation_status"] == "uncalibrated": badge += " — UNCALIBRATED DEVELOPMENT"
-        title = f"{cid}: {badge}"
+        title = f"{plot_id}: {badge}"
         ax.set(title=title, xlabel=f"log2 relative contact allocation: {comparison['case_condition']} / {comparison['reference_condition']}",
                ylabel="−log10 biological differential P value")
         ax.legend(fontsize=7, loc="best")
@@ -117,7 +120,7 @@ def render_loop_volcanoes(c, comparisons, current_outputs):
         fig.text(.5, .01, note, ha="center", fontsize=8, wrap=True)
         fig.tight_layout(rect=(0, .06, 1, 1))
         for suffix in ("png", "svg"):
-            path = figures / f"volcano.{cid}.{suffix}"
+            path = figures / f"volcano.{plot_id}.{suffix}"
             fig.savefig(path, dpi=150)
             outputs.append(path)
             if suffix == "png": plots.append((title, path))
@@ -130,3 +133,15 @@ def render_loop_volcanoes(c, comparisons, current_outputs):
                 "display_parameters_do_not_change_tests": True})
     outputs.append(status_path)
     return outputs, plots, statuses
+
+
+def render_loop_volcanoes(c, comparisons, current_outputs):
+    from .resolutions import quantification_resolutions
+    resolutions=quantification_resolutions(c)
+    if len(resolutions)==1:return _render_single(c,comparisons,current_outputs)
+    outputs,plots,statuses=[],[],[]
+    for res in resolutions:
+        products,pictures,entries=_render_single(dict(c,_volcano_resolution=res),comparisons,current_outputs)
+        outputs.extend(products);plots.extend(pictures);statuses.extend(dict(entry,resolution=res) for entry in entries)
+    atomic_json(Path(c['run_dir'])/'08_reports/volcano/status.json',{'comparisons':statuses,'axes':{'x':'log2 relative contact allocation','y':'-log10 biological PValue'},'significance':'BH FDR within each complete retained resolution-specific testing family; correlated resolutions are not independent confirmations'})
+    return list(dict.fromkeys(outputs)),plots,statuses

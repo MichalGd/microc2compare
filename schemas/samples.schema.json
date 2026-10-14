@@ -41,6 +41,12 @@
       },
       "provenance_path": {
         "type": "string"
+      },
+      "experimental_unit_id": {
+        "type": "string"
+      },
+      "culture_id": {
+        "type": "string"
       }
     },
     "additionalProperties": true

@@ -25,6 +25,40 @@
     "views_sha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "chromosome_classes": {
+      "type": "object",
+      "properties": {
+        "autosomes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "sex": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "mitochondrial": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": true

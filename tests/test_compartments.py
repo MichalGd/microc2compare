@@ -41,6 +41,9 @@ def test_compartment_export_preserves_orientation_missing_and_ambiguous_bins(tmp
          "MAX_DENSE_BINS": 10, "THREADS_COMPARTMENTS": 1,
          "MEMORY_MB_COMPARTMENTS": 1, "INSULATION_IGNORE_DIAGS": 2,
          "MIN_PHASING_CORRELATION": 0.1}
+    registered = tmp_path / "results/00_metadata/masks/100.bins.tsv"
+    registered.parent.mkdir(parents=True)
+    bins.to_csv(registered, sep="\t", index=False)
     outputs = science.compartments(c, "C1")
     assert len(outputs) == 4 and all(path.is_file() for path in outputs)
     table = pd.read_csv(outputs[0], sep="\t")

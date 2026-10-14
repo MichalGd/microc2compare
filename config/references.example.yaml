@@ -1,9 +1,9 @@
 reference_id: reference
 chromsizes: /immutable/references/assembly.chrom.sizes
-chromsizes_sha256: REPLACE_WITH_REAL_SHA256
+chromsizes_sha256: ""
 views: /immutable/references/assembly.views.bed
-views_sha256: REPLACE_WITH_REAL_SHA256
+views_sha256: ""
 blacklist: /immutable/references/assembly.blacklist.bed
-blacklist_sha256: REPLACE_WITH_REAL_SHA256
+blacklist_sha256: ""
 phasing_track: /immutable/references/assembly.100kb.phasing.bedgraph
-phasing_track_sha256: REPLACE_WITH_REAL_SHA256
+phasing_track_sha256: ""

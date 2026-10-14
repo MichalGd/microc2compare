@@ -16,8 +16,10 @@ FILES=('README.md','CONTRIBUTING.md','CHANGELOG.md','LICENSE.md','CITATION.cff',
        'examples/tiny/README.md',
        'examples/upstream-handoff/README.md','examples/upstream-handoff/samplesheet.csv',
        'validation/calibration-protocol.md','validation/calibration_registry.json',
-       'validation/datasets.tsv','validation/local-verification.md','validation/environment-solves.json')
+       'validation/datasets.tsv','validation/local-verification.md','validation/environment-solves.json',
+       'validation/performance-033-local.json','validation/general-purpose-040-local.json')
 EXTENSIONS={'.py','.R','.sh','.json','.yml','.yaml','.md','.conf','.csv','.tsv','.txt','.cff','.toml'}
+PRIVATE_WORKSPACE_TESTS = {'test_browser_loop_tracks11oct2026.py'}
 
 def selected():
     result=[ROOT/p for p in FILES if (ROOT/p).is_file()]
@@ -25,6 +27,9 @@ def selected():
         for path in (ROOT/directory).rglob('*'):
             if not path.is_file() or path.suffix not in EXTENSIONS:continue
             if any(part in ('__pycache__','.pytest_cache') for part in path.parts):continue
+            # Historical cohort-export tests import private Analysis scripts.
+            # General browser tests shipped below cover the public exporter.
+            if directory == 'tests' and path.name in PRIVATE_WORKSPACE_TESTS:continue
             if directory=='config' and (path.name=='project.conf' or '.local.' in path.name):continue
             # Config publication is deliberately limited to templates and examples.
             if directory=='config' and not (path.name=='config_template.conf' or path.name.startswith('resources_') or '.example.' in path.name):continue

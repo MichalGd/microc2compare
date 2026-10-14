@@ -1,0 +1,9 @@
+{
+  "reference_id": "mm39",
+  "samples": {
+    "sample1": {
+      "2000": "/project/prepared/sample1.2000.cool",
+      "4000": "/project/prepared/sample1.4000.cool"
+    }
+  }
+}

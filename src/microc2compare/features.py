@@ -45,15 +45,21 @@ def consensus_loops(frames, reference, resolution, tolerance=1):
                 row["source"] = sample
                 records.append(row)
     records.sort(key=lambda r: (r["chrom1"], r["chrom2"], r["start1"], r["start2"], r["source"]))
-    groups = []
+    groups, active = [], []
     for record in records:
+        # Earlier clusters outside the first-anchor tolerance cannot match any
+        # later sorted record. Keep original first-match complete-linkage order.
+        active = [group for group in active
+                  if group[0]["chrom1"] == record["chrom1"] and group[0]["chrom2"] == record["chrom2"]
+                  and record["start1"]-group[0]["start1"] <= resolution*tolerance]
         chosen = None
-        for group in groups:
+        for group in active:
             if all(record["chrom1"] == x["chrom1"] and record["chrom2"] == x["chrom2"] and
                    abs(record["start1"]-x["start1"]) <= resolution*tolerance and
                    abs(record["start2"]-x["start2"]) <= resolution*tolerance for x in group):
                 chosen = group; break
-        if chosen is None: groups.append([record])
+        if chosen is None:
+            group = [record]; groups.append(group); active.append(group)
         else: chosen.append(record)
     rows = []
     for group in groups:
@@ -66,19 +72,35 @@ def consensus_loops(frames, reference, resolution, tolerance=1):
 
 
 def quantify(clr, features, bins, mask, labels, c):
+    return quantify_many(clr, {"features": features}, bins, mask, labels, c)["features"]
+
+
+def quantify_many(clr, universes, bins, mask, labels, c):
+    """Measure candidate sets in one bounded, vectorized raw-pixel pass.
+
+    Exposure, zero counts, missing counts and exclusion rules are unchanged.
+    Coordinates use int64 keys; no dense chromosome/genome matrix is allocated.
+    """
     lookup = {(str(b.chrom), int(b.start)): int(i) for i, b in enumerate(bins.itertuples())}
-    targets, reasons = {}, {}
-    for index, row in features.iterrows():
-        i = lookup.get((str(row.chrom1), int(row.start1)))
-        j = lookup.get((str(row.chrom2), int(row.start2)))
-        reason = None
-        if i is None or j is None: reason = "outside_grid"
-        elif row.chrom1 != row.chrom2: reason = "trans_unsupported"
-        elif not mask[i] or not mask[j] or labels[i] < 0 or labels[i] != labels[j]: reason = "masked_or_different_view"
-        elif not c["LOOP_MIN_DISTANCE_BP"] <= int(row.start2-row.start1) <= c["LOOP_MAX_DISTANCE_BP"]: reason = "outside_distance_range"
-        if reason: reasons[index] = reason
-        else: targets[(min(i, j), max(i, j))] = index
-    counts = np.zeros(len(features), dtype=np.int64)
+    n = len(bins)
+    require(n*n <= np.iinfo(np.int64).max, "Grid exceeds int64 pixel-key capacity")
+    sets = {}
+    for name, features in universes.items():
+        targets, reasons = {}, {}
+        for index, row in features.iterrows():
+            i = lookup.get((str(row.chrom1), int(row.start1)))
+            j = lookup.get((str(row.chrom2), int(row.start2)))
+            reason = None
+            if i is None or j is None: reason = "outside_grid"
+            elif i == j: reason = "collapsed_to_diagonal"
+            elif row.chrom1 != row.chrom2: reason = "trans_unsupported"
+            elif not mask[i] or not mask[j] or labels[i] < 0 or labels[i] != labels[j]: reason = "masked_or_different_view"
+            elif not c["LOOP_MIN_DISTANCE_BP"] <= int(row.start2-row.start1) <= c["LOOP_MAX_DISTANCE_BP"]: reason = "outside_distance_range"
+            if reason: reasons[index] = reason
+            else: targets[min(i, j)*n+max(i, j)] = index
+        sets[name] = (targets, reasons)
+    keys = np.array(sorted({key for targets, _ in sets.values() for key in targets}), dtype=np.int64)
+    measured = np.zeros(len(keys), dtype=np.int64)
     exposure = 0
     positions = bins.start.to_numpy()
     for chunk in pixel_chunks(clr, c["PIXEL_CHUNKSIZE"]):
@@ -86,13 +108,24 @@ def quantify(clr, features, bins, mask, labels, c):
         distances = positions[j]-positions[i]
         eligible = mask[i] & mask[j] & (labels[i] >= 0) & (labels[i] == labels[j]) & (distances >= c["LOOP_MIN_DISTANCE_BP"]) & (distances <= c["LOOP_MAX_DISTANCE_BP"])
         exposure += int(y[eligible].sum())
-        for a, b, value in zip(i, j, y):
-            index = targets.get((int(a), int(b)))
-            if index is not None: counts[index] += int(value)
+        if len(keys):
+            pixel_keys = i.astype(np.int64)*n+j.astype(np.int64)
+            # Restrict the search to the candidate key range, then exact matches.
+            in_range = (pixel_keys >= keys[0]) & (pixel_keys <= keys[-1])
+            selected, selected_y = pixel_keys[in_range], y[in_range]
+            at = np.searchsorted(keys, selected)
+            matched = keys[at] == selected
+            np.add.at(measured, at[matched], selected_y[matched])
     require(exposure > 0, "Eligible cis-contact exposure is zero; cannot quantify relative contact allocation")
-    values = pd.Series(counts, dtype="Int64")
-    for index in reasons: values.loc[index] = pd.NA
-    return values, exposure, reasons
+    result = {}
+    for name, (targets, reasons) in sets.items():
+        counts = np.zeros(len(universes[name]), dtype=np.int64)
+        if targets:
+            counts[list(targets.values())] = measured[np.searchsorted(keys, list(targets))]
+        values = pd.Series(counts, dtype="Int64")
+        for index in reasons: values.loc[index] = pd.NA
+        result[name] = (values, exposure, reasons)
+    return result
 
 
 def boundary_consensus(frames, reference, resolution, window):

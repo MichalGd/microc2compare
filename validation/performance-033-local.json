@@ -1,0 +1,45 @@
+{
+  "fixture_sha256": "1e4ccdc6ec453b003daeebfe5c84e643bd8df3e16e9b90f2cd0d8a2cf8ac9472",
+  "numerical_agreement": "passed",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python": "3.11.9",
+  "results": {
+    "domain_calling": {
+      "domains": 1361,
+      "new_seconds": 0.08655799995176494,
+      "old_seconds": 1.8000301999854855,
+      "rows": 19000,
+      "speedup": 20.795653792700445,
+      "workers": 1
+    },
+    "event_coverage": {
+      "new_seconds": 0.014924100018106401,
+      "old_seconds": 2.5752727999933995,
+      "queries": 800,
+      "speedup": 172.5579965873316,
+      "workers": 1
+    },
+    "quantification": {
+      "candidate_sets": 2,
+      "includes_HDF5_IO": false,
+      "new_pixel_passes": 1,
+      "new_seconds": 0.2545677000307478,
+      "old_pixel_passes": 2,
+      "old_seconds": 1.559318899991922,
+      "speedup": 6.12536036505645,
+      "stored_pixels": 2001000,
+      "workers": 1
+    },
+    "window_expected_lookup": {
+      "expected_rows": 76000,
+      "includes_HDF5_IO": false,
+      "new_seconds": 0.02707620000001043,
+      "old_seconds": 1.637806900020223,
+      "speedup": 60.48880197441267,
+      "windows": 200,
+      "workers": 1
+    }
+  },
+  "scope": "synthetic algorithm-only timings; not target-server wall time",
+  "note": "One workstation run on synthetic in-memory data; background test execution may affect timings. Algorithm paths were compared with the same frozen implementations; fixture import plumbing was subsequently corrected."
+}

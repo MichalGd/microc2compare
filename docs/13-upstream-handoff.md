@@ -1,6 +1,6 @@
 # Preparing inputs from microc2tracks
 
-Use `scripts/prepare_microc2compare_inputs.py` before writing downstream manifests by hand. It reads the upstream sample sheet, relates technical rows to biological units, suggests existing matrices, and lists associated outputs. It neither runs the upstream workflow nor alters its configuration, matrices, weights or contacts.
+For ordinary use, set `UPSTREAM_INPUTS` in your project configuration and run `microc2compare -c project.conf --prepare-inputs`; [the simple project guide](32-simple-project-commands.md) combines multiple upstreams without software paths or repeated project/reference/resolution arguments. The standalone `scripts/prepare_microc2compare_inputs.py` examples below are advanced alternatives for custom inventories before writing manifests by hand. It reads the upstream sample sheet, relates technical rows to biological units, suggests existing matrices, and lists associated outputs. It neither runs the upstream workflow nor alters its configuration, matrices, weights or contacts.
 
 ## Preview first
 
@@ -67,6 +67,23 @@ For **lanes or resequencing of one library**, the membership should instead shar
 Helper-only optional sheet fields `subject_id`, `batch`, `library_id`, `source_kind`, `dedup_group_id`, `dedup_scope` and `source_checksum` can carry explicitly reviewed information forward. Their absence stays visible. The helper reads the original sheet without rewriting it; you can instead complete the exported drafts.
 
 ## Export editable drafts
+
+### Older manifests and deliberately selecting individual maps
+
+Version 0.2.7 also reads older sample/merge manifests without `reference_id` and the legacy headerless `technical_replicates.tsv` layout: `merge_group`, `sample`, valid-pairs path. It retains missing reference evidence; the confirmed reference must come from a sheet/run record or explicit `--legacy-reference-id`. The option never overrides a known conflicting reference. Malformed records still fail; upstream files are never rewritten.
+
+An older run may have pooled all samples even though your reviewed sheet now describes separate biological units. To deliberately select **one existing unmerged sample map per declared biological unit**, add:
+
+```bash
+python scripts/prepare_microc2compare_inputs.py \
+  --samplesheet /data/reviewed/samplesheet.csv \
+  --upstream-results /data/upstream/results \
+  --legacy-reference-id mm39 --individual-matrices --preview
+```
+
+Each sheet biological unit must have exactly one source. Multiple technical inputs still require upstream consolidation; this flag does not manufacture biological replication or split a pooled matrix. The same flag applies to `--write-drafts`. Historical biological/technical labels and pooled-group differences stay visible for review, and the old sample/technical records are copied to the inventory and provenance sidecars. Missing sample-manifest records are explicitly reported. Actual assay/condition/reference conflicts, missing/invalid maps, duplicate selections and shared subject/library errors still block.
+
+The default behavior without this flag retains strict historical membership checks, including partial-merge rejection. Use it only after checking that the individual maps represent the units in your reviewed sheet. Check count uniqueness, experimental identities and processing evidence before clearing draft fields.
 
 Choose a **new directory outside upstream results**:
 

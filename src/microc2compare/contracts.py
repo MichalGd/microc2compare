@@ -12,16 +12,22 @@ import tempfile
 from pathlib import Path
 
 STAGES = ("preflight", "register", "qc", "pool", "compartments", "insulation",
-          "loops", "consensus", "tads", "quantify", "aggregates", "differential",
-          "depth_sensitivity", "report")
+          "loops", "chromosight_discovery", "consensus", "tads", "quantify", "chromosight",
+          "annotation", "stripes", "stripe_consensus", "aggregates", "differential",
+          "depth_sensitivity", "browser_export", "report")
 SWITCHES = {"qc": "RUN_QC", "pool": "RUN_POOL", "compartments": "RUN_COMPARTMENTS",
             "insulation": "RUN_INSULATION", "tads": "RUN_TADS", "loops": "RUN_LOOPS", "aggregates": "RUN_AGGREGATES",
+            "chromosight": "RUN_CHROMOSIGHT", "annotation": "RUN_ANNOTATION",
+            "chromosight_discovery": "RUN_CHROMOSIGHT_DISCOVERY", "stripes": "RUN_STRIPES",
+            "stripe_consensus": "RUN_STRIPES", "browser_export": "RUN_BROWSER_EXPORT",
             "differential": "RUN_DIFFERENTIAL", "depth_sensitivity": "RUN_DEPTH_SENSITIVITY",
             "report": "RUN_FINAL_REPORT"}
-PATH_KEYS = {"SAMPLESHEET", "TECHNICAL_MEMBERSHIP", "COMPARISONS", "REFERENCE_REGISTRY",
+PATH_KEYS = {"SAMPLESHEET", "UPSTREAM_INPUTS", "TECHNICAL_MEMBERSHIP", "COMPARISONS", "REFERENCE_REGISTRY",
              "INDEPENDENT_FEATURES_REGISTRY", "OUTDIR", "SCRATCH_ROOT", "CORE_ENV_PREFIX",
              "HICREP_ENV_PREFIX", "DIFF_R_ENV_PREFIX", "POOLS_MANIFEST", "SADDLE_REFERENCE_TRACK",
-             "CALIBRATION_REGISTRY", "CORE_LOCK", "HICREP_LOCK", "DIFF_R_LOCK"}
+             "CALIBRATION_REGISTRY", "CORE_LOCK", "HICREP_LOCK", "DIFF_R_LOCK", "MATRIX_REGISTRY",
+             "LOOP_ENV_PREFIX", "LOOP_LOCK", "ANNOTATION_REGISTRY", "RESOLUTION_ELIGIBILITY_REGISTRY", "HSIEH_METHODS_REGISTRY",
+             "STRIPE_ENV_PREFIX", "STRIPE_LOCK", "BROWSER_ENV_PREFIX", "BROWSER_LOCK", "BROWSER_OUTPUT_DIR", "HIGLASS_CHROMSIZES"}
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 SAMPLE_FIELDS = ("sample_id", "project", "condition", "assay", "biological_replicate",
                  "subject_id", "reference_id", "matrix_path", "provenance_path")
@@ -168,8 +174,10 @@ def normalize(environment, config_dir):
             "Statistical policy floors cannot be weakened below 3 formal/2 preliminary units and 2 residual df")
     c["run_dir"] = str(Path(c["OUTDIR"]) / c["PROJECT"] / c["ANALYSIS_SET_ID"] / c["RUN_ID"])
     c["config_dir"] = str(native_path(config_dir).resolve())
-    from .analyses import configure_selection
+    from .analyses import configure_selection, requires_saddle, needs_loop_counts
     configure_selection(c, environment.get("M2C_ANALYSES", ""))
+    require(not requires_saddle(c) or c["RUN_COMPARTMENTS"] and c["RUN_AGGREGATES"] and c["RUN_FINAL_REPORT"] and "saddle" in c["AGGREGATE_MODULES"].split(","),
+            "The full fine-loop profile requires RUN_COMPARTMENTS=true, RUN_AGGREGATES=true, RUN_FINAL_REPORT=true and saddle in AGGREGATE_MODULES; use --analysis for a separate module run")
     require(not c["RUN_POOL"] or c["POOL_MODE"] != "import" or c["POOLS_MANIFEST"],
             "RUN_POOL=true with POOL_MODE=import requires POOLS_MANIFEST")
     require(not (c["RUN_DEPTH_SENSITIVITY"] and c["DEPTH_SENSITIVITY_MODE"] == "balanced_features")
@@ -178,10 +186,31 @@ def normalize(environment, config_dir):
             "Pool-based saddle partition requires RUN_POOL=true and a validated pool")
     require(not c["RUN_AGGREGATES"] or "saddle" not in c["AGGREGATE_MODULES"].split(",") or c["SADDLE_PARTITION_SOURCE"] != "external" or c["SADDLE_REFERENCE_TRACK"],
             "External saddle partition requires SADDLE_REFERENCE_TRACK")
-    require(not c["LOOP_SENSITIVITY_RESOLUTIONS"] or c["LOOP_SENSITIVITY_RESOLUTIONS"] == "5000",
-            "Only optional 5000-bp loop sensitivity is supported")
-    require(not c["LOOP_SENSITIVITY_RESOLUTIONS"] or c["FINE_RESOLUTION_QC_APPROVED"],
-            "5-kb calling requires FINE_RESOLUTION_QC_APPROVED=true after pilot review")
+    from .resolutions import loop_resolutions, quantification_resolutions
+    for key in ("LOOP_DISCOVERY_RESOLUTIONS", "LOOP_QUANTIFICATION_RESOLUTIONS", "LOOP_SENSITIVITY_RESOLUTIONS", "CHROMOSIGHT_DISCOVERY_RESOLUTIONS", "STRIPE_RESOLUTIONS"):
+        value = c[key]
+        require(not value or all(x.isdigit() and int(x)>0 for x in value.split(",")), f"{key}: use comma-separated positive resolutions")
+        require(not value or len(value.split(",")) == len(set(value.split(","))), f"{key}: duplicate resolutions")
+    require(c["LOOP_RESOLUTION"] in quantification_resolutions(c), "Primary LOOP_RESOLUTION must be quantified")
+    require(c["LOOP_MAX_DISTANCE_BP"] > c["LOOP_MIN_DISTANCE_BP"], "Loop distance range is empty")
+    require(not c["RUN_LOOPS"] or c["LOOP_CALLER"] != "cooltools_dots" or all(r >= 5000 for r in loop_resolutions(c)),
+            "Fine discovery below 5 kb requires Mustache; cooltools dots kernels are unsupported at these grids")
+    from .resolutions import chromosight_discovery_resolutions
+    active_counts = needs_loop_counts(c) or c['RUN_AGGREGATES'] and 'apa' in c['AGGREGATE_MODULES'].split(',')
+    fine = set((loop_resolutions(c) if c['RUN_LOOPS'] else []) + (quantification_resolutions(c) if active_counts else []) + (chromosight_discovery_resolutions(c) if c["RUN_CHROMOSIGHT_DISCOVERY"] else []))
+    active_fine = c['RUN_LOOPS'] or c['RUN_CHROMOSIGHT_DISCOVERY'] or active_counts
+    require(not active_fine or not any(r < 1000 for r in fine) or c["ALLOW_SUBKILOBASE_ANALYSIS"], "Sub-kilobase analysis requires explicit ALLOW_SUBKILOBASE_ANALYSIS=true")
+    require(not c["RUN_ANNOTATION"] or c["ANNOTATION_REGISTRY"], "Annotation requires ANNOTATION_REGISTRY")
+    lower = c["CHROMOSIGHT_DISCOVERY_MIN_DISTANCE_BP"] or c["LOOP_MIN_DISTANCE_BP"]
+    upper = c["CHROMOSIGHT_DISCOVERY_MAX_DISTANCE_BP"] or c["LOOP_MAX_DISTANCE_BP"]
+    require(not c["RUN_CHROMOSIGHT_DISCOVERY"] or upper > lower, "Chromosight discovery distance range is empty")
+    require(not c["RUN_CHROMOSIGHT_DISCOVERY"] or
+            c["LOOP_MIN_DISTANCE_BP"] <= lower < upper <= c["LOOP_MAX_DISTANCE_BP"],
+            "Chromosight discovery must lie within the common LOOP_MIN_DISTANCE_BP/LOOP_MAX_DISTANCE_BP measurement range; widen that range only when upstream contacts support it")
+    require(not c["RUN_STRIPES"] or c["STRIPE_RESOLUTIONS"], "Stripe analysis needs at least one grid")
+    require(not c["RUN_STRIPES"] or c["STRIPE_NORMALIZATION"] == "none", "The tested StripePy adapter uses raw contacts: STRIPE_NORMALIZATION=none")
+    require(all(c["APA_FLANK_BP"] % r == 0 for r in quantification_resolutions(c)),
+            "APA_FLANK_BP must align with measurement bins")
     windows = [int(x) for x in c["INSULATION_WINDOWS_BP"].split(",")]
     require(c["INSULATION_PRIMARY_WINDOW_BP"] in windows and all(x > 0 and x % c["INSULATION_RESOLUTION"] == 0 for x in windows),
             "Insulation windows must include the primary window and be positive bin multiples")
@@ -201,7 +230,7 @@ def enabled(c, stage):
     from .analyses import needs_loop_counts
     if stage=="qc":return c["RUN_QC"] or c["RUN_HICREP"]
     if stage == "consensus":
-        return c["RUN_LOOPS"] or c["RUN_INSULATION"]
+        return c["RUN_LOOPS"] or c.get("RUN_CHROMOSIGHT_DISCOVERY", False) or c["RUN_INSULATION"]
     if stage == "quantify":
         return needs_loop_counts(c)
     if stage == "tads":
@@ -257,21 +286,34 @@ def validate_metadata(c):
     ids = [s["sample_id"] for s in samples]
     require(len(set(ids)) == len(ids), "sample_id must be unique")
     base = Path(c["SAMPLESHEET"]).parent
-    subjects = set()
+    subject_conditions, unit_owners = {}, {}
     for s in samples:
         for key in SAMPLE_FIELDS:
             require(s[key], f"{s.get('sample_id')}: empty {key}")
         require(IDENTIFIER.fullmatch(s["sample_id"]), f"Unsafe sample_id: {s['sample_id']}")
-        require(s["sample_id"] not in ("mask", "labels") and not s["sample_id"].startswith("pool__"), "sample_id uses a reserved internal name")
+        require(s["sample_id"] not in ("mask", "labels") and not s["sample_id"].startswith(("pool__", "condition__")), "sample_id uses a reserved internal name")
         require(s["assay"] in ("microc", "hic"), f"{s['sample_id']}: assay must be microc or hic")
         require(s["reference_id"] == c["REFERENCE_ID"], f"{s['sample_id']}: reference mismatch")
         require(s["project"] == c["PROJECT"], f"{s['sample_id']}: project mismatch")
+        unit = s.get("experimental_unit_id", "").strip()
+        culture = s.get("culture_id", "").strip()
+        require(not unit or not culture or unit == culture,
+                f"{s['sample_id']}: experimental_unit_id and culture_id must agree when both are supplied")
+        unit = unit or culture
+        if unit:
+            require(unit not in unit_owners or unit_owners[unit] == s["subject_id"],
+                    f"Experimental unit {unit} belongs to multiple subjects")
+            unit_owners[unit] = s["subject_id"]
         pair = (s["subject_id"], s["condition"])
-        require(pair not in subjects, f"Repeated subject/condition {pair}: v0.1 requires one consolidated observation")
-        subjects.add(pair)
+        subject_conditions.setdefault(pair, []).append((s["sample_id"], unit))
         for field in ("matrix_path", "provenance_path", "pairs_path", "pair_stats_path"):
             if s.get(field):
                 s[field] = resolve(s[field], base)
+    for pair, observations in subject_conditions.items():
+        if len(observations) > 1:
+            units = [unit for _, unit in observations]
+            require(all(units) and len(set(units)) == len(units),
+                    f"Repeated subject/condition {pair}: each independently grown culture needs a unique explicit experimental_unit_id or culture_id; technical repeats must be consolidated")
     matrices = [s["matrix_path"] for s in samples]
     require(len(set(matrices)) == len(matrices), "Same matrix cannot supply two biological observations")
     require(c["ANALYSIS_MODE"] == "assay_comparison" or len({s["assay"] for s in samples}) == 1,
@@ -316,8 +358,12 @@ def validate_metadata(c):
             require(c["ANALYSIS_MODE"] != "assay_comparison", "Cross-assay inference is deferred")
             minimum = c["FORMAL_MIN_UNITS_PER_CONDITION"] if row["inference"] == "formal" else c["PRELIMINARY_MIN_UNITS_PER_CONDITION"]
             for condition in (row["case_condition"], row["reference_condition"]):
-                require(len({s["subject_id"] for s in chosen if s["condition"] == condition}) >= minimum,
-                        f"{row['comparison_id']}: {condition} requires {minimum} independent units")
+                condition_samples = [s for s in chosen if s["condition"] == condition]
+                independent_subjects = {s["subject_id"] for s in condition_samples}
+                require(len(independent_subjects) == len(condition_samples),
+                        f"{row['comparison_id']}: repeated subjects within {condition} require a nested donor/culture model, which is unsupported; use an explicit descriptive comparison")
+                require(len(independent_subjects) >= minimum,
+                        f"{row['comparison_id']}: {condition} requires {minimum} distinct independent subjects; cultures within one subject do not increase this count")
             for s in chosen:
                 require(all(r["dedup_scope"] != "unknown" for r in membership if r["sample_id"] == s["sample_id"]), "Unknown dedup scope blocks inference")
             if len({s["subject_id"] for s in chosen}) < len(chosen):

@@ -40,6 +40,10 @@
       "type": "string",
       "default": "samples.csv"
     },
+    "UPSTREAM_INPUTS": {
+      "type": "string",
+      "default": ""
+    },
     "TECHNICAL_MEMBERSHIP": {
       "type": "string",
       "default": "technical_membership.tsv"
@@ -237,7 +241,8 @@
       "type": "string",
       "default": "cooltools_dots",
       "enum": [
-        "cooltools_dots"
+        "cooltools_dots",
+        "mustache"
       ]
     },
     "LOOP_MIN_DISTANCE_BP": {
@@ -623,6 +628,297 @@
       "minimum": 0,
       "maximum": 20,
       "default": 5
+    },
+    "CHROMOSOME_SCOPE": {
+      "type": "string",
+      "default": "autosomes",
+      "enum": [
+        "autosomes",
+        "autosomes_plus_sex",
+        "explicit"
+      ]
+    },
+    "SEX_CHROMOSOMES": {
+      "type": "string",
+      "default": ""
+    },
+    "ANALYSIS_CHROMOSOMES": {
+      "type": "string",
+      "default": ""
+    },
+    "ANALYSIS_PROFILE": {
+      "type": "string",
+      "default": "existing",
+      "enum": [
+        "existing",
+        "practical_2_4kb",
+        "hsieh_inspired",
+        "hsieh_8grid",
+        "short_range_4kb"
+      ]
+    },
+    "MATRIX_REGISTRY": {
+      "type": "string",
+      "default": ""
+    },
+    "RESOLUTION_ELIGIBILITY_REGISTRY": {
+      "type": "string",
+      "default": ""
+    },
+    "HSIEH_METHODS_REGISTRY": {
+      "type": "string",
+      "default": ""
+    },
+    "ALLOW_SUBKILOBASE_ANALYSIS": {
+      "type": "boolean",
+      "default": false
+    },
+    "LOOP_DISCOVERY_RESOLUTIONS": {
+      "type": "string",
+      "default": ""
+    },
+    "LOOP_QUANTIFICATION_RESOLUTIONS": {
+      "type": "string",
+      "default": ""
+    },
+    "LOOP_ENV_PREFIX": {
+      "type": "string",
+      "default": ""
+    },
+    "LOOP_LOCK": {
+      "type": "string",
+      "default": ""
+    },
+    "MUSTACHE_P_THRESHOLD": {
+      "type": "number",
+      "default": 0.05,
+      "minimum": 0,
+      "maximum": 1
+    },
+    "MUSTACHE_SPARSITY_THRESHOLD": {
+      "type": "number",
+      "default": 0.88,
+      "minimum": 0,
+      "maximum": 1
+    },
+    "MUSTACHE_SIGMA_ZERO": {
+      "type": "number",
+      "default": 1.6,
+      "minimum": 0
+    },
+    "MUSTACHE_OCTAVES": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 1
+    },
+    "MUSTACHE_ITERATIONS": {
+      "type": "integer",
+      "default": 10,
+      "minimum": 1
+    },
+    "CROSS_RESOLUTION_TOLERANCE_BINS": {
+      "type": "number",
+      "default": 1.0,
+      "minimum": 0
+    },
+    "RUN_CHROMOSIGHT": {
+      "type": "boolean",
+      "default": false
+    },
+    "CHROMOSIGHT_MAX_MISSING_FRACTION": {
+      "type": "number",
+      "default": 0.1,
+      "minimum": 0,
+      "maximum": 1
+    },
+    "RUN_ANNOTATION": {
+      "type": "boolean",
+      "default": false
+    },
+    "ANNOTATION_REGISTRY": {
+      "type": "string",
+      "default": ""
+    },
+    "ANNOTATION_PROMOTER_UPSTREAM": {
+      "type": "integer",
+      "default": 2000,
+      "minimum": 0
+    },
+    "ANNOTATION_PROMOTER_DOWNSTREAM": {
+      "type": "integer",
+      "default": 500,
+      "minimum": 0
+    },
+    "ADA_RESOLUTION": {
+      "type": "integer",
+      "default": 10000,
+      "minimum": 1
+    },
+    "APA_FLANK_BP": {
+      "type": "integer",
+      "default": 100000,
+      "minimum": 1
+    },
+    "THREADS_TADS": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 1
+    },
+    "MEMORY_MB_TADS": {
+      "type": "integer",
+      "default": 8000,
+      "minimum": 1
+    },
+    "RUN_CHROMOSIGHT_DISCOVERY": {
+      "type": "boolean",
+      "default": false
+    },
+    "CHROMOSIGHT_DISCOVERY_RESOLUTIONS": {
+      "type": "string",
+      "default": ""
+    },
+    "CHROMOSIGHT_DISCOVERY_MIN_DISTANCE_BP": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0
+    },
+    "CHROMOSIGHT_DISCOVERY_MAX_DISTANCE_BP": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0
+    },
+    "CHROMOSIGHT_DISCOVERY_MIN_PEARSON": {
+      "type": "number",
+      "default": 0.3,
+      "minimum": 0,
+      "maximum": 1
+    },
+    "THREADS_CHROMOSIGHT": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 1
+    },
+    "MEMORY_MB_CHROMOSIGHT": {
+      "type": "integer",
+      "default": 16000,
+      "minimum": 1
+    },
+    "RUN_STRIPES": {
+      "type": "boolean",
+      "default": false
+    },
+    "STRIPE_RESOLUTIONS": {
+      "type": "string",
+      "default": "4000"
+    },
+    "STRIPE_ENV_PREFIX": {
+      "type": "string",
+      "default": ""
+    },
+    "STRIPE_LOCK": {
+      "type": "string",
+      "default": ""
+    },
+    "THREADS_STRIPES": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 1
+    },
+    "MEMORY_MB_STRIPES": {
+      "type": "integer",
+      "default": 24000,
+      "minimum": 1
+    },
+    "STRIPE_GENOMIC_BELT_BP": {
+      "type": "integer",
+      "default": 5000000,
+      "minimum": 1
+    },
+    "STRIPE_MAX_WIDTH_BP": {
+      "type": "integer",
+      "default": 100000,
+      "minimum": 1
+    },
+    "STRIPE_MIN_RELATIVE_CHANGE": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0
+    },
+    "STRIPE_NORMALIZATION": {
+      "type": "string",
+      "default": "none"
+    },
+    "STRIPE_MASK_POLICY": {
+      "type": "string",
+      "default": "common_segments",
+      "enum": [
+        "common_segments"
+      ]
+    },
+    "RUN_BROWSER_EXPORT": {
+      "type": "boolean",
+      "default": false
+    },
+    "EXPORT_UCSC": {
+      "type": "boolean",
+      "default": true
+    },
+    "EXPORT_HIGLASS": {
+      "type": "boolean",
+      "default": false
+    },
+    "BROWSER_OUTPUT_DIR": {
+      "type": "string",
+      "default": ""
+    },
+    "HIGLASS_CHROMSIZES": {
+      "type": "string",
+      "default": ""
+    },
+    "THREADS_BROWSER_EXPORT": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1
+    },
+    "MEMORY_MB_BROWSER_EXPORT": {
+      "type": "integer",
+      "default": 4000,
+      "minimum": 1
+    },
+    "AGGREGATE_WORKER_MEMORY_MB": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0
+    },
+    "AGGREGATE_CHECKPOINTS": {
+      "type": "boolean",
+      "default": true
+    },
+    "EXPECTED_CACHE": {
+      "type": "boolean",
+      "default": true
+    },
+    "LIMIT_MATRIX_READERS": {
+      "type": "boolean",
+      "default": false
+    },
+    "QUANTIFY_WORKER_MEMORY_MB": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0
+    },
+    "BROWSER_ENV_PREFIX": {
+      "type": "string",
+      "default": ""
+    },
+    "BROWSER_LOCK": {
+      "type": "string",
+      "default": ""
+    },
+    "QC_WORKER_MEMORY_MB": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0
     }
   },
   "required": [
@@ -740,7 +1036,9 @@
     "MEMORY_MB_PREFLIGHT",
     "PLOT_LOOP_VOLCANO",
     "VOLCANO_MIN_ABS_LOG2_EFFECT",
-    "VOLCANO_LABEL_TOP_N"
+    "VOLCANO_LABEL_TOP_N",
+    "THREADS_TADS",
+    "MEMORY_MB_TADS"
   ],
   "additionalProperties": true
 }

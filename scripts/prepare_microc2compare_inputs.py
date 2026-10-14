@@ -20,12 +20,14 @@ def main(argv=None):
     parser.add_argument("--resolutions", default="10000,100000", help="Comma-separated resolutions to inspect, in bp")
     parser.add_argument("--reference-id", help="Select one canonical reference/alias from a mixed run")
     parser.add_argument("--legacy-reference-id", help="Explicit identity ONLY for rows lacking sheet/run reference metadata")
+    parser.add_argument("--individual-matrices", action="store_true",
+                        help="Explicitly use one unmerged sample matrix per sheet biological unit; retain historical grouping conflicts for review")
     parser.add_argument("--json", action="store_true", help="Print the full machine-readable inventory")
     args = parser.parse_args(argv)
     try:
         resolutions = tuple(int(value.strip()) for value in args.resolutions.split(","))
         report = discover(args.samplesheet, args.upstream_results, args.project, resolutions,
-                          args.reference_id, args.legacy_reference_id)
+                          args.reference_id, args.legacy_reference_id, args.individual_matrices)
         if args.write_drafts:
             output = write_drafts(report, args.write_drafts)
             print(f"Drafts written to {output}; review READ_BEFORE_RUNNING.md before preflight.", file=sys.stderr)

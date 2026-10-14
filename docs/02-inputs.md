@@ -11,7 +11,8 @@ Every manifest is parsed as CSV or TSV with proper quoting, UTF-8 BOM handling a
 | `condition` | Experimental condition/time-point label |
 | `assay` | `microc` or `hic`; mixed assays require `ANALYSIS_MODE=assay_comparison` and descriptive comparisons |
 | `biological_replicate` | Biological replicate label; a library/lane is not a replicate |
-| `subject_id` | Stable donor/culture/experimental-unit identity; give independent cultures distinct IDs |
+| `subject_id` | Stable donor/animal identity when known; for cultures with no shared donor identity, use the independently established biological unit identity |
+| `experimental_unit_id`, `culture_id` | Optional aliases for an explicitly established independently grown culture within a subject; if both are filled they must agree |
 | `reference_id` | Must match the configured registered reference |
 | `matrix_path` | Existing `.norm.mcool`, `.cool`, or resolution-specific Cooler URI; one consolidated biological map per row |
 | `provenance_path` | JSON sidecar documenting upstream processing and balancing |
@@ -19,7 +20,7 @@ Every manifest is parsed as CSV or TSV with proper quoting, UTF-8 BOM handling a
 | additional covariates | Optional columns used by supported additive design formulas |
 | `pairs_path`, `pair_stats_path` | Optional provenance/contact files; no contact-level operation is implemented in v0.1 |
 
-One subject/condition observation may appear only once. Repeated subjects across conditions require explicit subject terms for inference. Multiple independent libraries from the same biological unit belong in one already consolidated sample. Duplicate matrix URIs, source IDs and libraries assigned to multiple samples fail validation. Distinct matrices cannot be proven biologically independent from filenames: the membership/provenance evidence must be reviewed.
+Multiple cultures from one donor in one condition can be registered for descriptive analysis when every row has a distinct explicit `experimental_unit_id` or `culture_id`. Keep their actual shared donor in `subject_id`; a new culture ID does not create a new donor. Each culture ID has one subject owner and occurs at most once per condition. A culture split across conditions may retain its ID. Formal/preliminary comparisons with multiple observations for one subject within a condition fail because the current R adapters do not fit a nested donor/culture model. Repeated subjects across conditions require explicit subject terms for inference. Multiple independent libraries from the same culture belong in one already consolidated sample. Duplicate matrix URIs, source IDs and libraries assigned to multiple samples fail validation. Distinct matrices or culture labels cannot prove biological independence: the experimental and membership/provenance evidence must be reviewed.
 
 ## technical_membership.tsv
 
@@ -35,13 +36,13 @@ Supported formulas are additive `~condition`, `~batch+condition`, or `~subject_i
 
 ## Reference registration
 
-Use one JSON/YAML object with `reference_id`, `chromsizes`, `chromsizes_sha256`, `views`, `views_sha256`. Optional `blacklist`, `phasing_track` assets each require the corresponding SHA256. Chromosome sizes are two tab-separated columns without headers; views are BED4 (`chrom start end name`) without headers. View names must be unique, intervals nonoverlapping, within chromosomes, and complete-bin aligned at requested grids. Chromosome name, order and length must exactly match the maps.
+Use one JSON/YAML object with `reference_id`, `chromsizes`, `chromsizes_sha256`, `views`, `views_sha256`. Optional `blacklist`, `phasing_track` assets each require the corresponding SHA256. Chromosome sizes are two tab-separated columns without headers; views are BED4 (`chrom start end name`) without headers. View names must be unique, intervals nonoverlapping, within chromosomes, and complete-bin aligned at requested grids. Every view chromosome must exist in every biological matrix with the registered length and exact bin boundaries. Native chromosome order and extra unselected sequences may differ: coordinates are mapped to each file's native bin IDs. The reference order defines the exported analysis grid. See [common chromosomes and X/Y](27-common-chromosomes.md).
 
 The phasing asset is an immutable, assembly-matched bedGraph (`chrom start end value`) on the exact compartment grid. Compartments require it. Blacklist BED3 excludes any overlapping bin; a common bin mask also intersects all relevant samples' finite positive inherited weights. No downstream mask changes the upstream balancing solution. Chromosome arms can be registered as separate views to avoid crossing centromeres. Bins outside all views are excluded.
 
 ## Upstream provenance.json
 
-Required keys: `reference_id`, `count_units="unique_contacts"`, `filters`, `balancing`, `dedup_scope`, `library_ids`, `source_ids`. `filters` declares `mapq`, `min_distance_bp`, `chromosome_policy`; record other consequential filtering keys as well. Compatible samples must have identical filter and per-resolution balancing recipes. The biological membership must match the sidecar library/source IDs. Record the upstream commit, commands, software, assembly source and actual input identities when available.
+Required keys: `reference_id`, `count_units="unique_contacts"`, `filters`, `balancing`, `dedup_scope`, `library_ids`, `source_ids`. `filters` declares `mapq`, `min_distance_bp`, `chromosome_policy`; record other consequential filtering keys as well. Compatible samples must have identical contact filters and per-resolution numerical balancing recipes. The chromosome policy may differ when exact common view coordinates pass validation; retain each actual policy in provenance and review its effect on upstream balancing. Never replace it with a fabricated common policy. The biological membership must match the sidecar library/source IDs. Record the upstream commit, commands, software, assembly source and actual input identities when available.
 
 `balancing` is keyed by resolution as strings. Each entry declares `weight_column`, `convention` (`multiplicative`/`divisive`), `converged` and `recipe`. Convergence must be true. Missing legacy convergence can use the explicit `LEGACY_WEIGHT_VALIDATION=finite_positive` exception, with a visible evidence gap; explicitly failed convergence never passes. Infinite/nonpositive weights fail, NaNs represent excluded bins. Divisive weights are converted in memory only. A `.norm.mcool` stores raw integer pixels and weights together; import registers the existing groups, not separate raw/balanced exports.
 
